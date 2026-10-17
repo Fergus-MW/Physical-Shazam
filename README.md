@@ -226,15 +226,17 @@ This mode captures audio with PortAudio/sounddevice, keeps inference outside the
 ```sh
 uv run pytest -q
 uv run ruff check src tests scripts
-node --test tests/audio_worklet.test.mjs
+node --test tests/*.test.mjs
 uv run python scripts/smoke_test.py
 ```
 
 | Suite | What it covers |
 |---|---|
-| **pytest** (15 tests) | Stream boundaries, resampling, cue persistence, independent matches, debounce/rearm/cooldown, silence and background rejection, API errors, a mocked Gemini request, and a real local rosbridge wire exchange. These tests inject an encoder double where recognition accuracy doesn't matter. |
-| **Node AudioWorklet test** | The actual AudioWorklet preserves every PCM sample across chunk boundaries and the final recording flush, including stereo downmixing. |
+| **pytest** (27 tests) | Stream boundaries, resampling, cue persistence, independent matches, debounce/rearm/cooldown, silence and background rejection, malformed WebSocket frames, API errors, Gemini failures and response validation, and a real local rosbridge wire exchange. These tests inject an encoder double where recognition accuracy doesn't matter. |
+| **Node** (8 tests) | Real HTML element references, cancellation during uploads/recording, concurrent upload limits, stale teacher/save responses, microphone permission resolving after cancellation, and AudioWorklet PCM preservation across chunk boundaries and final flush. |
 | **`smoke_test.py`** | Runs the **real pretrained YAMNet** through enrollment, synthetic streaming positives, a noise negative, persisted detection events and a WebSocket bridge sink, in an isolated temporary workspace. |
+
+Dashboard workflow tests use an isolated DOM/network harness; the sample enrollment flow was also checked in Chrome. Actual microphone capture still requires browser permission.
 
 On the development Mac, the smoke test detected both replayed chimes, rejected the noise fixture, and measured about **3 ms median inference per window**. This is a synthetic integration check, not a benchmark of household recall, false accepts per hour, or real ROS delivery. A live Gemini audio assessment was also verified during development.
 

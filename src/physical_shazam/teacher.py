@@ -81,7 +81,7 @@ def analyze(samples, label=""):
         return {**Teaching.model_validate(json.loads(text)).model_dump(), "model": config["model"]}
     except httpx.HTTPError as exc:
         raise ValueError("Could not reach Gemini. Check the network and try again.") from exc
-    except (KeyError, IndexError, json.JSONDecodeError) as exc:
+    except (KeyError, IndexError, TypeError, AttributeError, json.JSONDecodeError) as exc:
         raise ValueError(
             "Gemini did not return a usable audio assessment. Try a clearer recording."
         ) from exc

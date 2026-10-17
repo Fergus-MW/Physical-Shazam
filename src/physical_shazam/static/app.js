@@ -22,7 +22,10 @@ let examples = [],
   teacherJob = null,
   teacherPending = false,
   enrollmentGeneration = 0,
-  editingCue = null;
+  editingCue = null,
+  exampleUploading = 0,
+  enrollmentSaving = false,
+  calibrationGeneration = 0;
 let waveformSamples = new Float32Array(200),
   streamSeconds = 0,
   ackPending = false;
@@ -486,13 +489,14 @@ function wavBlob(chunks, rate) {
     }
   return new Blob([buffer], { type: "audio/wav" });
 }
-async function recordClip(seconds, progress) {
+async function recordClip(seconds, progress, isCurrent = () => true) {
   if (recording) throw new Error("A recording is already in progress.");
   recording = true;
   const chunks = [];
   let mic;
   try {
     mic = await createMicrophone((chunk) => chunks.push(chunk));
+    if (!isCurrent()) return null;
     await new Promise((resolve) => {
       const started = performance.now();
       const interval = setInterval(
@@ -520,41 +524,73 @@ async function recordClip(seconds, progress) {
     waveformSamples = new Float32Array(200);
   }
 }
-async function uploadExample(file) {
-  if (examples.length >= 5)
+async function uploadExample(file, generation = enrollmentGeneration) {
+  if (generation !== enrollmentGeneration || !$("enroll-dialog").open)
+    return false;
+  if (teacherPending || enrollmentSaving)
+    throw new Error("Wait for the current enrollment operation to finish.");
+  if (examples.length + exampleUploading >= 5)
     throw new Error("Five examples is the enrollment limit.");
   if (file.size > 12 * 1024 * 1024)
     throw new Error("Each audio file must be under 12 MB.");
   const form = new FormData();
   form.append("file", file, "example.wav");
-  const example = await api("/api/examples", { method: "POST", body: form });
-  examples.push(example);
-  teacherJob = null;
-  $("teacher-result").classList.add("hidden");
+  exampleUploading++;
   renderExamples();
+  try {
+    const example = await api("/api/examples", { method: "POST", body: form });
+    if (generation !== enrollmentGeneration || !$("enroll-dialog").open) {
+      await api(`/api/examples/${example.token}`, { method: "DELETE" }).catch(
+        () => {},
+      );
+      return false;
+    }
+    examples.push(example);
+    teacherJob = null;
+    $("teacher-result").classList.add("hidden");
+    $("ask-teacher").innerHTML = `Ask Gemini${icon("arrow")}`;
+    return true;
+  } finally {
+    if (generation === enrollmentGeneration) {
+      exampleUploading--;
+      renderExamples();
+    }
+  }
 }
 function renderExamples() {
   $("example-count").textContent = `${examples.length} / 5`;
   $("example-list").innerHTML = examples
     .map(
       (example, i) =>
-        `<div class="example-row"><span class="example-check">${icon("check")}</span><span>Example ${i + 1}<br><small>${example.duration.toFixed(1)}s · ${example.level_db} dBFS</small></span><audio controls preload="none" src="/api/examples/${example.token}/audio" aria-label="Play example ${i + 1}"></audio><button type="button" class="icon-button" data-remove="${example.token}" aria-label="Remove example ${i + 1}">${icon("close")}</button></div>`,
+        `<div class="example-row"><span class="example-check">${icon("check")}</span><span>Example ${i + 1}<br><small>${example.duration.toFixed(1)}s · ${example.level_db} dBFS</small></span><audio controls preload="none" src="/api/examples/${example.token}/audio" aria-label="Play example ${i + 1}"></audio><button type="button" class="icon-button" data-remove="${example.token}" aria-label="Remove example ${i + 1}" ${teacherPending || enrollmentSaving || exampleUploading || recording ? "disabled" : ""}>${icon("close")}</button></div>`,
     )
     .join("");
   document.querySelectorAll("[data-remove]").forEach(
     (el) =>
       (el.onclick = async () => {
-        await api(`/api/examples/${el.dataset.remove}`, { method: "DELETE" });
-        examples = examples.filter((e) => e.token !== el.dataset.remove);
-        teacherJob = null;
-        $("teacher-result").classList.add("hidden");
-        renderExamples();
+        const generation = enrollmentGeneration;
+        try {
+          await api(`/api/examples/${el.dataset.remove}`, { method: "DELETE" });
+          if (generation !== enrollmentGeneration) return;
+          examples = examples.filter((e) => e.token !== el.dataset.remove);
+          teacherJob = null;
+          $("teacher-result").classList.add("hidden");
+          $("ask-teacher").innerHTML = `Ask Gemini${icon("arrow")}`;
+          renderExamples();
+        } catch (error) {
+          if (generation === enrollmentGeneration)
+            errorIn("enroll-error", error.message);
+        }
       }),
   );
-  $("record-button").disabled = examples.length >= 5;
-  $("upload-button").disabled = examples.length >= 5;
-  $("ask-teacher").disabled = !examples.length || teacherPending;
-  $("save-cue").disabled = !examples.length || recording || teacherPending;
+  const busy = exampleUploading > 0 || teacherPending || enrollmentSaving;
+  $("record-button").disabled = examples.length >= 5 || busy;
+  $("upload-button").disabled = examples.length >= 5 || busy || recording;
+  $("ask-teacher").disabled = !examples.length || busy || recording;
+  $("save-cue").disabled = !examples.length || busy || recording;
+  $("save-cue").innerHTML = enrollmentSaving
+    ? "Learning…"
+    : `Add to library${icon("arrow")}`;
 }
 async function openEnrollment() {
   if (recording || listenPending) return;
@@ -568,12 +604,16 @@ async function openEnrollment() {
   examples = [];
   teacherJob = null;
   teacherPending = false;
+  exampleUploading = 0;
+  enrollmentSaving = false;
   enrollmentGeneration++;
   $("cue-name").value = "";
   $("teacher-result").classList.add("hidden");
   $("ask-teacher").innerHTML = `Ask Gemini${icon("arrow")}`;
   errorIn("enroll-error", "");
   $("capture-label").textContent = "Let’s hear your sound.";
+  $("record-button").innerHTML = `${icon("mic")}Record 4 seconds`;
+  $("drop-area").classList.remove("recording");
   $("capture-description").textContent =
     "Record a clear example, or drop in an audio file.";
   renderExamples();
@@ -585,16 +625,18 @@ document
 async function trySample() {
   await openEnrollment();
   if (!$("enroll-dialog").open) return;
+  const generation = enrollmentGeneration;
   try {
     $("cue-name").value = "Two-tone lab chime";
     toast("Loading a synthetic lab sound. This uses the real encoder.");
     const response = await fetch("/static/samples/two-tone.wav");
     if (!response.ok) throw new Error("Sample file unavailable.");
-    await uploadExample(await response.blob());
+    if (!(await uploadExample(await response.blob(), generation))) return;
     $("capture-description").textContent =
       "Synthetic sample loaded. Play it, then listen for the same chime.";
   } catch (error) {
-    errorIn("enroll-error", error.message);
+    if (generation === enrollmentGeneration)
+      errorIn("enroll-error", error.message);
   }
 }
 $("record-button").onclick = async () => {
@@ -602,45 +644,61 @@ $("record-button").onclick = async () => {
     recordFinish();
     return;
   }
+  if (recording) return;
   const generation = enrollmentGeneration;
   errorIn("enroll-error", "");
   $("record-button").innerHTML = `${icon("mic")}Stop recording`;
-  $("capture-label").textContent = "Listening for your example…";
-  $("capture-area").classList.add("recording");
+  $("capture-label").textContent = "Waiting for microphone access…";
+  $("capture-description").textContent =
+    "Allow microphone access in the browser to begin.";
+  $("drop-area").classList.add("recording");
   $("upload-button").disabled = true;
   $("save-cue").disabled = true;
   $("ask-teacher").disabled = true;
   try {
-    const blob = await recordClip(4, (left) => {
-      $("capture-description").textContent =
-        `Make the sound now · ${left.toFixed(1)} seconds left`;
-    });
+    const blob = await recordClip(
+      4,
+      (left) => {
+        $("capture-label").textContent = "Listening for your example…";
+        $("capture-description").textContent =
+          `Make the sound now · ${left.toFixed(1)} seconds left`;
+      },
+      () => generation === enrollmentGeneration && $("enroll-dialog").open,
+    );
     if (generation === enrollmentGeneration && $("enroll-dialog").open) {
       $("capture-label").textContent = "Processing your example…";
-      await uploadExample(blob);
+      await uploadExample(blob, generation);
     }
   } catch (error) {
-    errorIn("enroll-error", error.message);
+    if (generation === enrollmentGeneration)
+      errorIn("enroll-error", error.message);
   } finally {
-    $("record-button").innerHTML = `${icon("mic")}Record 4 seconds`;
-    $("capture-area").classList.remove("recording");
-    $("capture-label").textContent = "Ready for another example.";
-    $("capture-description").textContent =
-      "Try a different distance or room position.";
-    renderExamples();
+    if (generation === enrollmentGeneration) {
+      $("record-button").innerHTML = `${icon("mic")}Record 4 seconds`;
+      $("drop-area").classList.remove("recording");
+      $("capture-label").textContent = "Ready for another example.";
+      $("capture-description").textContent =
+        "Try a different distance or room position.";
+      renderExamples();
+    }
   }
 };
 $("upload-button").onclick = () => $("audio-file").click();
 $("audio-file").onchange = async (event) => {
+  const generation = enrollmentGeneration;
   errorIn("enroll-error", "");
   $("upload-button").disabled = true;
   try {
-    for (const file of event.target.files) await uploadExample(file);
+    for (const file of event.target.files)
+      await uploadExample(file, generation);
   } catch (error) {
-    errorIn("enroll-error", error.message);
+    if (generation === enrollmentGeneration)
+      errorIn("enroll-error", error.message);
   } finally {
-    event.target.value = "";
-    renderExamples();
+    if (generation === enrollmentGeneration) {
+      event.target.value = "";
+      renderExamples();
+    }
   }
 };
 const drop = $("drop-area");
@@ -652,11 +710,14 @@ drop.ondragleave = () => drop.classList.remove("dragover");
 drop.ondrop = async (event) => {
   event.preventDefault();
   drop.classList.remove("dragover");
-  if (recording) return;
+  if (recording || teacherPending || enrollmentSaving) return;
+  const generation = enrollmentGeneration;
   try {
-    for (const file of event.dataTransfer.files) await uploadExample(file);
+    for (const file of event.dataTransfer.files)
+      await uploadExample(file, generation);
   } catch (error) {
-    errorIn("enroll-error", error.message);
+    if (generation === enrollmentGeneration)
+      errorIn("enroll-error", error.message);
   }
 };
 $("ask-teacher").onclick = async () => {
@@ -673,11 +734,13 @@ $("ask-teacher").onclick = async () => {
         name: $("cue-name").value,
       },
     });
+    if (generation !== enrollmentGeneration) return;
     teacherJob = job.id;
     for (let i = 0; i < 100; i++) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       if (generation !== enrollmentGeneration) return;
       const state = await api(`/api/teacher/${job.id}`);
+      if (generation !== enrollmentGeneration) return;
       if (state.status === "error") throw new Error(state.error);
       if (state.status === "done") {
         const result = state.result;
@@ -693,15 +756,24 @@ $("ask-teacher").onclick = async () => {
       "Assessment timed out. Check your connection and try again.",
     );
   } catch (error) {
-    errorIn("enroll-error", error.message);
-    $("ask-teacher").textContent = "Try Gemini again";
+    if (generation === enrollmentGeneration) {
+      errorIn("enroll-error", error.message);
+      $("ask-teacher").textContent = "Try Gemini again";
+    }
   } finally {
-    teacherPending = false;
-    renderExamples();
+    if (generation === enrollmentGeneration) {
+      teacherPending = false;
+      renderExamples();
+    }
   }
 };
 $("enroll-form").onsubmit = async (event) => {
   event.preventDefault();
+  if (exampleUploading || enrollmentSaving || recording || teacherPending)
+    return;
+  const generation = enrollmentGeneration;
+  enrollmentSaving = true;
+  renderExamples();
   errorIn("enroll-error", "");
   $("save-cue").disabled = true;
   $("save-cue").textContent = "Learning…";
@@ -714,19 +786,28 @@ $("enroll-form").onsubmit = async (event) => {
         teacher_job: teacherJob,
       },
     });
-    examples = [];
-    $("enroll-dialog").close();
+    if (generation === enrollmentGeneration) {
+      examples = [];
+      $("enroll-dialog").close();
+    }
     await refresh();
     toast(`Learned ${cue.name}. Your listener is ready.`);
   } catch (error) {
-    errorIn("enroll-error", error.message);
+    if (generation === enrollmentGeneration)
+      errorIn("enroll-error", error.message);
   } finally {
-    $("save-cue").innerHTML = `Add to library${icon("arrow")}`;
-    renderExamples();
+    if (generation === enrollmentGeneration) {
+      enrollmentSaving = false;
+      $("save-cue").innerHTML = `Add to library${icon("arrow")}`;
+      renderExamples();
+    }
   }
 };
 $("enroll-dialog").addEventListener("close", async () => {
   enrollmentGeneration++;
+  exampleUploading = 0;
+  teacherPending = false;
+  enrollmentSaving = false;
   recordFinish?.();
   $("example-list")
     .querySelectorAll("audio")
@@ -873,7 +954,9 @@ $("test-file").onchange = async (event) => {
   }
 };
 $("calibrate-button").onclick = async () => {
-  if (recording) return;
+  if (recording || listenPending) return;
+  calibrationGeneration++;
+  $("record-background").disabled = false;
   resumeListening = !!socket;
   if (socket) await stopListening();
   $("calibration-status").textContent = status?.background_calibrated
@@ -883,25 +966,34 @@ $("calibrate-button").onclick = async () => {
 };
 $("record-background").onclick = async () => {
   if (recording) return;
+  const generation = calibrationGeneration;
   $("record-background").disabled = true;
+  $("calibration-status").textContent =
+    "Waiting for microphone access. Allow it in the browser to begin.";
   try {
     const blob = await recordClip(
       5,
       (left) =>
         ($("calibration-status").textContent =
           `Recording the room · ${left.toFixed(1)} seconds remaining`),
+      () => generation === calibrationGeneration && $("calibrate-dialog").open,
     );
+    if (generation !== calibrationGeneration || !$("calibrate-dialog").open)
+      return;
     const form = new FormData();
     form.append("file", blob, "room.wav");
     await api("/api/background", { method: "POST", body: form });
+    if (generation !== calibrationGeneration) return;
     $("calibration-status").textContent =
       "Room reference saved. Target sounds must now beat this background match.";
     toast("Room calibration saved.");
     await refresh();
   } catch (error) {
-    $("calibration-status").textContent = error.message;
+    if (generation === calibrationGeneration)
+      $("calibration-status").textContent = error.message;
   } finally {
-    $("record-background").disabled = false;
+    if (generation === calibrationGeneration)
+      $("record-background").disabled = false;
   }
 };
 $("reset-background").onclick = async () => {
@@ -914,6 +1006,7 @@ $("reset-background").onclick = async () => {
   }
 };
 $("calibrate-dialog").addEventListener("close", async () => {
+  calibrationGeneration++;
   recordFinish?.();
   if (resumeListening) {
     resumeListening = false;

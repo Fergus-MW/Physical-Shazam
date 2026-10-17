@@ -5,6 +5,7 @@ import time
 
 import httpx
 import numpy as np
+import pytest
 from websockets.sync.server import serve
 
 from physical_shazam import teacher
@@ -51,6 +52,27 @@ def test_gemini_sends_actual_wav_audio_and_validates_result(monkeypatch):
     result = teacher.analyze([np.ones(16000, dtype=np.float32) * 0.1])
     assert result["label"] == "Chime"
     assert result["model"] == "gemini-2.5-flash"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        {"candidates": None},
+        {"candidates": [{"content": {"parts": None}}]},
+        {"candidates": [{"content": {"parts": [42]}}]},
+    ],
+)
+def test_gemini_rejects_malformed_provider_responses(monkeypatch, payload):
+    monkeypatch.setattr(teacher, "settings", lambda: {"key": "test", "model": "test"})
+    original = httpx.Client
+    transport = httpx.MockTransport(lambda request: httpx.Response(200, text=json.dumps(payload)))
+    monkeypatch.setattr(
+        teacher.httpx, "Client", lambda **kwargs: original(transport=transport, **kwargs)
+    )
+    with pytest.raises(ValueError, match="usable audio assessment"):
+        teacher.analyze([np.ones(16000, dtype=np.float32) * 0.1])
 
 
 def test_rosbridge_advertises_then_publishes_structured_string():

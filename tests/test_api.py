@@ -1,6 +1,7 @@
 import time
 
 import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 
 from physical_shazam.audio import SAMPLE_RATE, wav_bytes
@@ -137,3 +138,51 @@ def test_background_calibration_rejects_short_clip(tmp_path):
         result = client.post("/api/background", files={"file": ("room.wav", wav_bytes(audio(4)))})
         assert result.status_code == 200
         assert client.get("/api/status").json()["background_calibrated"] is True
+
+
+@pytest.mark.parametrize("payload", [[], None, 42, "hello"])
+def test_listener_rejects_non_object_config_and_releases_session(tmp_path, payload):
+    with make_client(tmp_path) as client:
+        wait_for_model(client)
+        with client.websocket_connect("/api/listen") as socket:
+            socket.send_json(payload)
+            assert socket.receive_json()["type"] == "error"
+        with client.websocket_connect("/api/listen") as socket:
+            socket.send_json({"sample_rate": SAMPLE_RATE})
+            assert socket.receive_json()["type"] == "ready"
+
+
+@pytest.mark.parametrize("phase", ["setup", "audio"])
+def test_listener_rejects_the_wrong_websocket_frame_type(tmp_path, phase):
+    with make_client(tmp_path) as client:
+        wait_for_model(client)
+        with client.websocket_connect("/api/listen") as socket:
+            if phase == "setup":
+                socket.send_bytes(b"{}")
+            else:
+                socket.send_json({"sample_rate": SAMPLE_RATE})
+                socket.receive_json()
+                socket.send_text("not PCM")
+            assert socket.receive_json()["type"] == "error"
+
+
+def test_unexpected_teacher_failure_does_not_leave_a_running_job(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "physical_shazam.teacher.settings", lambda: {"key": "test", "model": "test"}
+    )
+
+    def fail(*args):
+        raise RuntimeError("unexpected provider response")
+
+    monkeypatch.setattr("physical_shazam.teacher.analyze", fail)
+    with make_client(tmp_path) as client:
+        wait_for_model(client)
+        token = upload(client)
+        job = client.post("/api/teacher", json={"examples": [token]}).json()
+        for _ in range(50):
+            state = client.get(f"/api/teacher/{job['id']}").json()
+            if state["status"] != "running":
+                break
+            time.sleep(0.01)
+        assert state["status"] == "error"
+        assert "unexpected provider response" not in state["error"]

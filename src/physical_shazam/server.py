@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import os
 import re
 import shutil
@@ -303,6 +304,15 @@ def create_app(directory=None, encoder=None):
                 }
             except ValueError as exc:
                 service.jobs[job_id] = {"status": "error", "error": str(exc)}
+            except Exception as exc:  # noqa: BLE001 - fault boundary for the background worker.
+                # A failed provider/parser must not leave the single teacher slot occupied forever.
+                logging.getLogger(__name__).error(
+                    "Gemini assessment failed unexpectedly (%s)", type(exc).__name__
+                )
+                service.jobs[job_id] = {
+                    "status": "error",
+                    "error": "Gemini assessment failed unexpectedly. Please try again.",
+                }
 
         threading.Thread(target=work, daemon=True, name="gemini-teacher").start()
         return {"id": job_id, "status": "running"}
@@ -446,14 +456,29 @@ def create_app(directory=None, encoder=None):
             return
         service.live = True
         buffer, detector = WindowBuffer(), Detector(service.store)
+
+        async def receive_payload(field):
+            message = await asyncio.wait_for(socket.receive(), timeout=10)
+            if message["type"] == "websocket.disconnect":
+                raise WebSocketDisconnect(message.get("code", 1000))
+            if message.get(field) is None:
+                raise ValueError(
+                    "Start with a JSON text configuration."
+                    if field == "text"
+                    else "Audio frames must contain binary float32 PCM."
+                )
+            return message[field]
+
         try:
-            config = await asyncio.wait_for(socket.receive_json(), timeout=10)
+            config = json.loads(await receive_payload("text"))
+            if not isinstance(config, dict):
+                raise ValueError("Microphone configuration must be a JSON object.")  # noqa: TRY004
             rate = config.get("sample_rate", 0)
             if not isinstance(rate, int) or not 8_000 <= rate <= 192_000:
                 raise ValueError("Unsupported microphone sample rate.")
             await socket.send_json({"type": "ready", "sample_rate": SAMPLE_RATE})
             while True:
-                data = await asyncio.wait_for(socket.receive_bytes(), timeout=10)
+                data = await receive_payload("bytes")
                 if len(data) % 4 or not 0 < len(data) <= rate * 4:
                     raise ValueError("Send at most one second of float32 PCM per message.")
                 samples = prepare(np.frombuffer(data, dtype="<f4"), rate)
