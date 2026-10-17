@@ -100,7 +100,7 @@ The backend rereads this file for each Gemini request, so changes apply without 
 ## How it works
 
 <p align="center">
-  <a href="docs/architecture.mp4"><img src="docs/architecture.gif" alt="Animated system diagram: microphone audio flows through audio windows and the local encoder into cue matching, detections go to the event journal and the ROS 2 bridge, and Gemini is an optional enrollment side path into the sound library" width="360"></a>
+  <a href="docs/architecture.mp4"><img src="docs/architecture.gif" alt="Animated system diagram: microphone audio flows through audio windows and the local encoder into cue matching, detections go to the event journal and the ROS 2 bridge, and Gemini is an optional enrollment side path into the sound library" width="820"></a>
 </p>
 
 The dashboard shows the same diagram live: each stage lights up from the real microphone level, encoder state, best cue score, detections, ROS 2 delivery and Gemini availability. Click a stage to jump to its settings. The loop is rendered from [`docs/src/architecture.html`](docs/src/architecture.html).

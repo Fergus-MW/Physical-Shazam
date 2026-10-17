@@ -5,9 +5,9 @@
     <title>Physical Shazam · architecture loop</title>
     <link rel="stylesheet" href="../../src/physical_shazam/static/style.css" />
     <style>
-      html, body { margin: 0; width: 720px; height: 1280px; overflow: hidden; background: #101310; }
+      html, body { margin: 0; width: 1280px; height: 360px; overflow: hidden; background: #101310; }
       #stage { position: absolute; inset: 0; display: grid; place-items: center; }
-      #stage svg.system-diagram { width: 680px; height: auto; }
+      #stage svg.system-diagram { width: 1240px; height: auto; }
       #sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
     </style>
   </head>
@@ -25,8 +25,7 @@
 
       const LOOP = 6;
       const diagram = new SystemDiagram(document.getElementById("diagram"), {
-        layout: "portrait",
-        scale: 1.75,
+        layout: "landscape",
       });
       const ms = (s) => s * 1000;
       const schedule = [];
@@ -52,7 +51,7 @@
         const score = heard ? 0.91 : 0.2 + 0.08 * Math.sin(t * 3);
         diagram.set("mic", "active", `${level.toFixed(1)} dBFS`);
         diagram.set("window", "active", "16 kHz · 975 ms");
-        diagram.set("encoder", "active", `YAMNet · ${5 + Math.round(1.5 + Math.sin(t * 4))} ms`);
+        diagram.set("encoder", "active", `CED-small · ${9 + Math.round(1.5 + Math.sin(t * 4))} ms`);
         diagram.set("library", local > 4.1 && local < 5.6 ? "active" : "ready", "3 sounds · 3 on");
         diagram.set("gemini", local > 4.1 && local < 5.4 ? "active" : "ready", local > 4.1 && local < 5.4 ? "Reviewing…" : "On demand");
         diagram.set("match", "active", `${score.toFixed(2)} · Doorbell`);
