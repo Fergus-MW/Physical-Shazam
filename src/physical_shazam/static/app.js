@@ -1042,18 +1042,7 @@ for (const dialog of document.querySelectorAll("dialog"))
   });
 
 const diagramSvg = $("system-diagram");
-const narrow = matchMedia("(max-width: 640px)");
-let diagram = new SystemDiagram(diagramSvg, {
-  layout: narrow.matches ? "portrait" : "landscape",
-  scale: narrow.matches ? 1.75 : 1,
-});
-narrow.addEventListener("change", () => {
-  diagram = new SystemDiagram(diagramSvg, {
-    layout: narrow.matches ? "portrait" : "landscape",
-    scale: narrow.matches ? 1.75 : 1,
-  });
-  updateDiagram();
-});
+const diagram = new SystemDiagram(diagramSvg);
 const live = { frames: 0, inferenceMs: null, level: null, lastEvent: null };
 diagramSvg.addEventListener("click", (event) => {
   const id = event.target.closest("[data-node]")?.dataset.node;

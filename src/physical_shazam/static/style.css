@@ -2426,8 +2426,14 @@ code {
   .system-stats { grid-template-columns: repeat(2, 1fr); }
   .system-stats div:nth-child(3) { border-left: 0; }
 }
+@media (max-width: 1200px) {
+  .station-grid { grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); }
+}
 @media (max-width: 790px) {
+  .station-grid { grid-template-columns: 1fr; }
   .journey { grid-template-columns: 1fr; }
+  .system-canvas { overflow-x: auto; padding: 4px 12px 8px; }
+  .system-diagram { min-width: 760px; }
   .system-legend { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
