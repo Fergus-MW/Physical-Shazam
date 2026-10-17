@@ -16,7 +16,7 @@ def settings():
     values = dotenv_values(".env")
     return {
         "key": os.getenv("GEMINI_API_KEY") or values.get("GEMINI_API_KEY") or "",
-        "model": os.getenv("GEMINI_MODEL") or values.get("GEMINI_MODEL") or "gemini-2.5-flash",
+        "model": os.getenv("GEMINI_MODEL") or values.get("GEMINI_MODEL") or "gemini-3.8-flash",
     }
 
 
@@ -59,7 +59,7 @@ def analyze(samples, label=""):
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": Teaching.model_json_schema(),
-            "temperature": 0.2,
+            "thinkingConfig": {"thinkingLevel": "LOW"},
         },
     }
     try:

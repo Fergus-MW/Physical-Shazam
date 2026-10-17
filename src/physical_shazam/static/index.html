@@ -82,12 +82,6 @@
           ></span
         ></a
       >
-      <div class="workspace">
-        <span class="workspace-icon">P</span>
-        <div>Personal workspace<small>LOCAL PROTOTYPE</small></div>
-        <span class="workspace-chevron">⌄</span>
-      </div>
-      <div class="nav-label">WORKSPACE</div>
       <nav aria-label="Main navigation">
         <button class="nav-item active" data-page="station">
           <svg><use href="#i-wave" /></svg>Listening station<span
@@ -116,11 +110,6 @@
             <p>Cloud intelligence, only<br />when you ask for it.</p>
           </div>
         </div>
-        <button class="station-id" id="about-button">
-          <span class="avatar">PS</span
-          ><span>Laptop station<small>Development workspace</small></span
-          ><span>↗</span>
-        </button>
       </div>
     </aside>
     <div class="app-shell">
@@ -131,7 +120,7 @@
         </div>
         <div class="topbar-right">
           <span class="local-badge"><i></i> Local inference</span
-          ><span class="version">PROTOTYPE / 01</span>
+          >
         </div>
       </header>
       <main>
@@ -150,6 +139,11 @@
         <div id="notice" class="notice hidden" role="status"></div>
 
         <section id="station-page" class="page-content">
+          <ol class="journey" aria-label="How it works">
+            <li id="step-teach"><span>1</span>Teach a sound<small>1–5 short examples</small></li>
+            <li id="step-listen"><span>2</span>Start listening<small>Audio stays on this machine</small></li>
+            <li id="step-detect"><span>3</span>See detections<small>Journal and ROS 2 events</small></li>
+          </ol>
           <div class="station-grid">
             <section class="panel monitor-panel">
               <div class="panel-heading">
@@ -157,116 +151,63 @@
                   <span class="overline">LIVE INPUT</span>
                   <h2>Your acoustic space</h2>
                 </div>
-                <span class="status-pill" id="listen-status"
-                  ><i></i>Standby</span
-                >
+                <span class="status-pill" id="listen-status"><i></i>Standby</span>
               </div>
               <div class="waveform-wrap">
                 <div class="waveform-grid"></div>
-                <canvas
-                  id="waveform"
-                  aria-label="Live microphone waveform"
-                ></canvas>
+                <canvas id="waveform" aria-label="Live microphone waveform"></canvas>
                 <div class="waveform-idle" id="waveform-idle">
-                  <span class="mic-orbit"
-                    ><svg><use href="#i-mic" /></svg></span
-                  ><span
-                    >Your space has a story.<small
-                      >Start listening to hear what happens.</small
-                    ></span
-                  >
+                  <span class="mic-orbit"><svg><use href="#i-mic" /></svg></span
+                  ><span>Your space has a story.<small>Start listening to hear what happens.</small></span>
                 </div>
                 <div class="waveform-label">
-                  <span>WAVEFORM / MONO</span
-                  ><span id="input-level">— dBFS</span>
+                  <span>WAVEFORM / MONO</span><span id="input-level">— dBFS</span>
                 </div>
               </div>
               <div class="monitor-footer">
                 <div class="source-label">
-                  <span class="source-icon"
-                    ><svg><use href="#i-mic" /></svg
-                  ></span>
-                  <div id="mic-name">
-                    System microphone<small
-                      >16 kHz processing · 480 ms hop</small
-                    >
-                  </div>
+                  <span class="source-icon"><svg><use href="#i-mic" /></svg></span>
+                  <span id="mic-name">System microphone<small>16 kHz processing · 480 ms hop</small></span>
                 </div>
                 <button class="button primary" id="listen-button">
                   <svg><use href="#i-play" /></svg><span>Start listening</span>
                 </button>
               </div>
             </section>
-            <section class="panel engine-panel">
+            <section class="panel activity-panel">
               <div class="panel-heading">
                 <div>
-                  <span class="overline">BEHIND THE LISTENING</span>
-                  <h2>Two loops. One purpose.</h2>
+                  <span class="overline">RECENT ACTIVITY</span>
+                  <h2>What it heard</h2>
                 </div>
-                <svg class="muted-icon"><use href="#i-chip" /></svg>
+                <button class="text-button" data-open-page="journal">
+                  Journal<svg><use href="#i-arrow" /></svg>
+                </button>
               </div>
-              <div class="engine-item">
-                <div class="engine-icon mint">
-                  <svg><use href="#i-wave" /></svg>
-                </div>
-                <div>
-                  <div class="engine-title">
-                    The listener<span class="tag">LOCAL</span>
-                  </div>
-                  <p>YAMNet + your sound prototypes</p>
-                  <span class="engine-state" id="model-state"
-                    ><i></i>Loading audio encoder…</span
-                  >
-                </div>
-              </div>
-              <div class="engine-divider">
-                <span></span>independent by design<span></span>
-              </div>
-              <div class="engine-item">
-                <div class="engine-icon lavender">
-                  <svg><use href="#i-cloud" /></svg>
-                </div>
-                <div>
-                  <div class="engine-title">
-                    The teacher<span class="tag">ON DEMAND</span>
-                  </div>
-                  <p>Gemini · enrollment guidance</p>
-                  <button class="inline-link" id="teacher-state">
-                    Set up your API key ↗
-                  </button>
-                </div>
-              </div>
-              <div class="engine-foot">
-                <i></i>Live microphone audio stays on this machine.
-              </div>
+              <div id="recent-events" class="events-panel compact"></div>
             </section>
           </div>
-          <section class="metrics" aria-label="Station metrics">
-            <div class="metric">
-              <span
-                >Learned sounds<svg><use href="#i-grid" /></svg></span
-              ><strong id="metric-cues">0<small>in your library</small></strong>
+          <section class="panel system-panel" aria-labelledby="system-title">
+            <div class="panel-heading">
+              <div>
+                <span class="overline">LIVE SYSTEM</span>
+                <h2 id="system-title">How your sound becomes an event</h2>
+              </div>
+              <div class="system-legend" aria-hidden="true">
+                <span class="legend active"><i></i>Active</span>
+                <span class="legend ready"><i></i>Ready</span>
+                <span class="legend warn"><i></i>Needs you</span>
+                <span class="legend off"><i></i>Off</span>
+              </div>
             </div>
-            <div class="metric">
-              <span
-                >Inference time<svg><use href="#i-chip" /></svg></span
-              ><strong id="metric-latency"
-                >—<small>waiting for audio</small></strong
-              >
+            <div class="system-canvas">
+              <svg id="system-diagram" role="img" aria-label="Live system diagram"></svg>
             </div>
-            <div class="metric">
-              <span
-                >Detected events<svg><use href="#i-bell" /></svg></span
-              ><strong id="metric-events"
-                >0<small>in recent history</small></strong
-              >
-            </div>
-            <div class="metric">
-              <span
-                >ROS 2 output<svg><use href="#i-link" /></svg></span
-              ><strong class="metric-text" id="metric-ros"
-                >Not connected<small>configure rosbridge</small></strong
-              >
+            <div class="system-stats" aria-live="polite">
+              <div><span>Inference</span><strong id="stat-latency">—</strong></div>
+              <div><span>Windows analysed</span><strong id="stat-frames">0</strong></div>
+              <div><span>Best match</span><strong id="stat-match">—</strong></div>
+              <div><span>ROS 2 delivered</span><strong id="stat-ros">—</strong></div>
             </div>
           </section>
           <div class="section-heading">
@@ -279,30 +220,6 @@
             </button>
           </div>
           <div id="station-cues" class="cue-grid"></div>
-          <div class="section-heading event-heading">
-            <div>
-              <h2>Recent activity<span class="live-dot"></span></h2>
-            </div>
-            <button class="text-button" data-open-page="journal">
-              Event journal<svg><use href="#i-arrow" /></svg>
-            </button>
-          </div>
-          <div id="recent-events" class="panel events-panel"></div>
-          <div class="signal-path">
-            <span class="signal-label">THE SIGNAL PATH</span
-            ><span
-              ><svg><use href="#i-mic" /></svg>Audio input</span
-            ><b>→</b
-            ><span
-              ><svg><use href="#i-chip" /></svg>Local embeddings</span
-            ><b>→</b
-            ><span
-              ><svg><use href="#i-grid" /></svg>Prototype match</span
-            ><b>→</b
-            ><span
-              ><svg><use href="#i-link" /></svg>Structured event</span
-            ><span class="signal-end">No live cloud calls.</span>
-          </div>
         </section>
 
         <section id="library-page" class="page-content hidden">
@@ -343,12 +260,6 @@
             <code>data/events.jsonl</code>.
           </p>
         </section>
-        <footer>
-          <span
-            >PHYSICAL SHAZAM<span class="footer-dot">·</span>LEARNING TO
-            LISTEN</span
-          ><span>Built for the sounds around you.</span>
-        </footer>
       </main>
     </div>
 
@@ -459,7 +370,7 @@
         </p>
         <pre>
 GEMINI_API_KEY=your-key-here
-GEMINI_MODEL=gemini-2.5-flash</pre
+GEMINI_MODEL=gemini-3.8-flash</pre
         >
         <small>Save the file, then reopen this panel. No restart needed.</small>
       </div>
