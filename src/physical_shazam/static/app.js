@@ -1064,6 +1064,7 @@ function updateDiagram() {
   if (!status) return;
   const listening = Boolean(socket) && !listenPending;
   const model = status.model_status;
+  const encoderLabel = status.encoder.startsWith("ced") ? "CED-small" : "YAMNet";
   const cues = status.cues || [];
   const enabled = cues.filter((c) => c.enabled).length;
   const best = listening ? bestMatch() : null;
@@ -1095,10 +1096,10 @@ function updateDiagram() {
     model === "error"
       ? "Unavailable · retry"
       : model !== "ready"
-        ? "Loading YAMNet…"
+        ? `Loading ${encoderLabel}…`
         : listening && live.inferenceMs != null
-          ? `YAMNet · ${Math.round(live.inferenceMs)} ms`
-          : "YAMNet · ready",
+          ? `${encoderLabel} · ${Math.round(live.inferenceMs)} ms`
+          : `${encoderLabel} · ready`,
   );
   diagram.set(
     "library",
