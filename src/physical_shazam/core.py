@@ -8,7 +8,10 @@ from pathlib import Path
 
 import numpy as np
 
+from .audio import decode
 from .encoder import unit
+
+DEFAULT_THRESHOLD = 0.65
 
 
 def now():
@@ -16,7 +19,7 @@ def now():
 
 
 class CueStore:
-    def __init__(self, directory: Path, encoder_name="yamnet-google-1"):
+    def __init__(self, directory: Path, encoder_name, migrate=False):
         self.directory = directory
         self.directory.mkdir(parents=True, exist_ok=True)
         self.path = directory / "cues.json"
@@ -24,12 +27,17 @@ class CueStore:
         self.encoder_name = encoder_name
         self.cues = {}
         self.background = None
+        self.pending_migration = None
+        self.migration = None
         if self.path.exists():
             document = json.loads(self.path.read_text())
             if document["encoder"] != encoder_name:
-                raise ValueError(
-                    "Saved cues use a different encoder. Use a separate data directory."
-                )
+                if not migrate:
+                    raise ValueError(
+                        "Saved cues use a different encoder. Use a separate data directory."
+                    )
+                self.pending_migration = document
+                return
             self.cues = {cue["id"]: cue for cue in document["cues"]}
             self.background = document.get("background")
 
@@ -49,7 +57,39 @@ class CueStore:
             )
             temporary.replace(self.path)
 
-    def add(self, name, embeddings, threshold=0.82, action="notify"):
+    def migrate(self, embed):
+        """Re-embed every cue from its saved example audio after an encoder change."""
+        with self.lock:
+            document = self.pending_migration
+            if document is None:
+                return None
+            backup = self.directory / f"cues.{document['encoder']}.json"
+            backup.write_text(json.dumps(document, indent=2))
+            cues, skipped = {}, []
+            for cue in document["cues"]:
+                files = sorted((self.directory / "examples" / cue["id"]).glob("*.wav"))
+                if not files:
+                    skipped.append(cue["name"])
+                    continue
+                embeddings = [unit(embed(decode(f.read_bytes()))) for f in files]
+                cues[cue["id"]] = {
+                    **cue,
+                    "threshold": DEFAULT_THRESHOLD,
+                    "prototype": unit(np.mean(embeddings, axis=0)).tolist(),
+                }
+            self.cues = cues
+            self.background = None
+            self.pending_migration = None
+            self.migration = {
+                "from": document["encoder"],
+                "cues": len(cues),
+                "skipped": skipped,
+                "backup": backup.name,
+            }
+            self.save()
+            return self.migration
+
+    def add(self, name, embeddings, threshold=DEFAULT_THRESHOLD, action="notify"):
         if not 1 <= len(embeddings) <= 5:
             raise ValueError("Enroll with 1–5 examples.")
         cue = {

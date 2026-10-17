@@ -32,8 +32,8 @@ from .audio import (
     validate_example,
     wav_bytes,
 )
-from .core import CueStore, Detector
-from .encoder import YamnetEncoder
+from .core import DEFAULT_THRESHOLD, CueStore, Detector
+from .encoder import CedEncoder
 from .ros import RosPublisher
 
 STATIC = Path(__file__).parent / "static"
@@ -43,7 +43,7 @@ MAX_UPLOAD = 12 * 1024 * 1024
 class Enrollment(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     examples: list[str] = Field(min_length=1, max_length=5)
-    threshold: float = Field(default=0.82, ge=0.1, le=0.99)
+    threshold: float = Field(default=DEFAULT_THRESHOLD, ge=0.1, le=0.99)
     teacher_job: str | None = None
 
     @field_validator("name")
@@ -94,7 +94,7 @@ class Service:
     def __init__(self, directory, encoder):
         self.directory = directory
         self.encoder = encoder
-        self.store = CueStore(directory, encoder.name)
+        self.store = CueStore(directory, encoder.name, migrate=True)
         self.staging = {}
         self.jobs = {}
         self.lock = threading.RLock()
@@ -124,17 +124,19 @@ class Service:
         try:
             self.encoder.load()
             self.encoder.embed(np.zeros(WINDOW, dtype=np.float32))
+            if self.store.pending_migration is not None:
+                self.store.migrate(self.encoder.embed)
             self.model_status, self.model_error = "ready", None
         except Exception as exc:
             self.model_status = "error"
-            self.model_error = f"Could not load YAMNet ({type(exc).__name__}). Check server logs and internet access."
+            self.model_error = f"Could not load the audio encoder ({type(exc).__name__}). Check server logs and internet access."
             import logging
 
-            logging.getLogger(__name__).exception("YAMNet initialization failed")
+            logging.getLogger(__name__).exception("Audio encoder initialization failed")
 
     def require_model(self):
         if self.model_status != "ready":
-            raise HTTPException(503, self.model_error or "YAMNet is loading. Please wait a moment.")
+            raise HTTPException(503, self.model_error or "The audio encoder is loading. Please wait a moment.")
 
     def examples(self, tokens):
         with self.lock:
@@ -163,6 +165,7 @@ class Service:
             "frames": self.frames,
             "listening": self.live,
             "background_calibrated": self.store.background is not None,
+            "migration": self.store.migration,
             "teacher": {
                 "configured": bool(teacher_config["key"]),
                 "model": teacher_config["model"],
@@ -198,7 +201,7 @@ class Service:
 
 def create_app(directory=None, encoder=None):
     directory = Path(directory or os.getenv("PHYSICAL_SHAZAM_DATA", "data"))
-    service = Service(directory, encoder or YamnetEncoder())
+    service = Service(directory, encoder or CedEncoder())
 
     @asynccontextmanager
     async def lifespan(app):
@@ -449,7 +452,7 @@ def create_app(directory=None, encoder=None):
             await socket.send_json(
                 {
                     "type": "error",
-                    "message": "Another session is listening, or YAMNet is not ready.",
+                    "message": "Another session is listening, or the audio encoder is not ready.",
                 }
             )
             await socket.close()
