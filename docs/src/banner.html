@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#101310;--panel:#181c17;--border:#2a3028;--text:#eeefe8;--muted:#858e7e;--ml:#adb4a5;--mint:#c0e994;--mintd:#293623;--lav:#b8a7da}
+*{box-sizing:border-box;margin:0}
+body{width:1280px;height:420px;background:var(--bg);font-family:"DM Sans",sans-serif;color:var(--text);overflow:hidden;position:relative}
+.grid{position:absolute;inset:0;background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);background-size:40px 40px;opacity:.28;mask-image:radial-gradient(ellipse 70% 90% at 75% 50%,#000 20%,transparent 75%)}
+.glow{position:absolute;width:620px;height:620px;right:-80px;top:-110px;background:radial-gradient(circle,rgba(192,233,148,.13),transparent 62%)}
+.left{position:absolute;left:72px;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:22px;width:620px}
+.eyebrow{font:500 12px "IBM Plex Mono";letter-spacing:.22em;color:var(--muted);display:flex;align-items:center;gap:12px}
+.eyebrow:before{content:"";width:22px;height:1px;background:var(--muted)}
+.brand{display:flex;align-items:center;gap:20px}
+.brand svg{width:64px;height:64px;stroke:var(--mint);stroke-width:2;fill:none;stroke-linecap:round}
+.name{font-weight:600;font-size:58px;line-height:.95;letter-spacing:-.035em}
+.name b{color:var(--mint);font-weight:600}
+.tag{font-size:21px;color:var(--ml);line-height:1.45;max-width:600px}
+.pills{display:flex;gap:10px;margin-top:4px}
+.pill{font:500 12px "IBM Plex Mono";color:var(--ml);border:1px solid var(--border);background:var(--panel);border-radius:999px;padding:7px 13px;display:flex;align-items:center;gap:8px}
+.pill i{width:7px;height:7px;border-radius:50%;background:var(--mint)}
+.pill.l i{background:var(--lav)}
+.right{position:absolute;right:64px;top:62px;width:540px;height:296px;border:1px solid var(--border);background:rgba(24,28,23,.85);border-radius:16px;padding:22px 24px}
+.rh{display:flex;justify-content:space-between;align-items:center}
+.lbl{font:500 11px "IBM Plex Mono";letter-spacing:.18em;color:var(--muted)}
+.ttl{font-size:17px;font-weight:500;margin-top:6px}
+.badge{font:500 11px "IBM Plex Mono";color:var(--mint);border:1px solid #3d4d33;background:var(--mintd);border-radius:999px;padding:5px 11px;display:flex;gap:7px;align-items:center}
+.badge i{width:6px;height:6px;border-radius:50%;background:var(--mint);box-shadow:0 0 8px var(--mint)}
+#wave{margin-top:16px;display:block}
+.foot{display:flex;justify-content:space-between;margin-top:12px;font:400 11px "IBM Plex Mono";color:var(--muted)}
+.foot span b{color:var(--mint);font-weight:500}
+</style></head><body>
+<div class="grid"></div><div class="glow"></div>
+<div class="left">
+  <div class="eyebrow">AMBIENT INTELLIGENCE</div>
+  <div class="brand"><svg viewBox="0 0 24 24"><path d="M3 10v4m4-7v10m5-14v18m5-14v10m4-7v4"/></svg>
+    <div class="name">physical<br>shazam<b>.</b></div></div>
+  <div class="tag">Teach it a sound from a few examples. It recognises that sound from a live microphone, entirely on your machine.</div>
+  <div class="pills"><div class="pill"><i></i>YAMNet · local</div><div class="pill l"><i></i>Gemini · on demand</div><div class="pill"><i></i>ROS 2 events</div></div>
+</div>
+<div class="right">
+  <div class="rh"><div><div class="lbl">LIVE INPUT</div><div class="ttl">Front door chime</div></div><div class="badge"><i></i>cue.detected · 0.91</div></div>
+  <svg id="wave" width="490" height="170"></svg>
+  <div class="foot"><span>WAVEFORM / MONO · 16 kHz</span><span>threshold 0.82 · <b>2/2 windows</b></span></div>
+</div>
+<script>
+const s=document.getElementById('wave'),W=490,H=170,n=70,bw=4,gap=(W-n*bw)/(n-1);let h='';
+let seed=7;const r=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+h+=`<line x1="0" x2="${W}" y1="${H/2}" y2="${H/2}" stroke="#2a3028"/>`;
+for(let i=0;i<n;i++){const x=i*(bw+gap);const hit=i>=40&&i<=55;
+ let a=hit?(0.45+0.5*Math.abs(Math.sin((i-40)/15*Math.PI))*(0.75+0.25*r())):(0.06+0.16*r()*(0.6+0.4*Math.sin(i/5)));
+ const bh=Math.max(4,a*(H-14));
+ h+=`<rect x="${x}" y="${(H-bh)/2}" width="${bw}" height="${bh}" rx="2" fill="${hit?'#c0e994':'#4b5546'}"/>`}
+const x0=40*(bw+gap)-6,x1=55*(bw+gap)+bw+6;
+h=`<rect x="${x0}" y="2" width="${x1-x0}" height="${H-4}" rx="8" fill="rgba(192,233,148,.06)" stroke="rgba(192,233,148,.35)" stroke-dasharray="3 4"/>`+h;
+s.innerHTML=h;
+</script></body></html>
