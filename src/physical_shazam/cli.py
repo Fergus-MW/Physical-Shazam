@@ -12,7 +12,7 @@ def main():
     web = commands.add_parser("serve", help="Start the dashboard")
     web.add_argument("--port", type=int, default=8765)
     web.add_argument("--host", default="127.0.0.1")
-    commands.add_parser("download-model", help="Download and warm up the real YAMNet encoder")
+    commands.add_parser("download-model", help="Download and warm up the CED-small encoder")
     listen = commands.add_parser(
         "listen", help="Headless microphone detector (install --extra mic)"
     )
@@ -35,11 +35,11 @@ def main():
         import numpy as np
 
         from .audio import WINDOW
-        from .encoder import YamnetEncoder
+        from .encoder import CedEncoder
 
-        encoder = YamnetEncoder()
+        encoder = CedEncoder()
         encoder.embed(np.zeros(WINDOW, dtype=np.float32))
-        print("YAMNet downloaded and ready (1024-dimensional embeddings).")
+        print("CED-small downloaded and ready (384-dimensional embeddings).")
     elif args.command == "listen":
         import queue
 
@@ -49,10 +49,10 @@ def main():
             parser.error("Install microphone support: uv sync --extra mic")
         from .audio import SAMPLE_RATE, WINDOW, WindowBuffer, prepare
         from .core import Detector
-        from .encoder import YamnetEncoder
+        from .encoder import CedEncoder
         from .server import Service
 
-        service = Service(Path(args.data_dir), YamnetEncoder())
+        service = Service(Path(args.data_dir), CedEncoder())
         service.warm()
         service.require_model()
         if not service.store.snapshot():

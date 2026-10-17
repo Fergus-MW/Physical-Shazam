@@ -229,7 +229,7 @@ async function refresh() {
       };
     } else if (!ready) {
       $("notice").textContent =
-        "Preparing the local audio encoder. The first launch downloads YAMNet; following launches use the cached model.";
+        "Preparing the local audio encoder. The first launch downloads CED-small; following launches use the cached model.";
       $("notice").className = "notice";
     } else $("notice").className = "notice hidden";
     const nextCues = JSON.stringify(status.cues);
@@ -595,7 +595,7 @@ function renderExamples() {
 async function openEnrollment() {
   if (recording || listenPending) return;
   if (!status || status.model_status !== "ready") {
-    toast("Wait for YAMNet to finish loading, then try again.");
+    toast("Wait for the audio encoder to finish loading, then try again.");
     return;
   }
   referenceAudio?.pause();
@@ -890,7 +890,7 @@ $("connections-nav").onclick = openConnections;
 $("teacher-state").onclick = openConnections;
 $("about-button").onclick = () =>
   toast(
-    "Physical Shazam · Real local YAMNet detection, optional Gemini guidance, and ROS 2 events.",
+    "Physical Shazam · Real local CED-small detection, optional Gemini guidance, and ROS 2 events.",
   );
 $("ros-form").onsubmit = async (event) => {
   event.preventDefault();
