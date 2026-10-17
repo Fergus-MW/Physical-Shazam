@@ -1,3 +1,5 @@
+import { SystemDiagram } from "/static/diagram.js";
+
 const $ = (id) => document.getElementById(id);
 const icon = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const esc = (value) =>
@@ -120,8 +122,6 @@ function renderCues() {
     : emptyLibrary();
   $("nav-count").textContent = cues.length;
   $("cue-count").textContent = String(cues.length).padStart(2, "0");
-  $("metric-cues").innerHTML =
-    `${cues.length}<small>${cues.filter((c) => c.enabled).length} active in library</small>`;
   $("library-summary").textContent =
     `${cues.length} learned sound${cues.length === 1 ? "" : "s"} · ${cues.filter((c) => c.enabled).length} active`;
   document
@@ -175,8 +175,6 @@ function eventRows(events) {
 function renderEvents() {
   $("recent-events").innerHTML = eventRows((status?.events || []).slice(0, 4));
   $("journal-events").innerHTML = eventRows(status?.events || []);
-  $("metric-events").innerHTML =
-    `${status?.events.length || 0}<small>in recent history</small>`;
 }
 function updateScores(scores) {
   for (const [id, score] of scores) {
@@ -194,31 +192,16 @@ async function refresh() {
   try {
     status = await api("/api/status");
     const ready = status.model_status === "ready";
-    $("model-state").innerHTML =
-      `<i></i>${ready ? "Ready for your sounds" : status.model_status === "error" ? "Encoder unavailable" : "Loading audio encoder…"}`;
     $("listen-button").disabled = (!ready || listenPending) && !socket;
     document
       .querySelectorAll(".teach-button")
       .forEach((el) => (el.disabled = !ready));
-    $("teacher-state").textContent = status.teacher.configured
-      ? "API key configured ↗"
-      : "Set up your API key ↗";
     $("gemini-config-status").textContent = status.teacher.configured
       ? `Key configured · ${status.teacher.model}`
       : "API key not configured";
     $("ros-config-status").textContent =
       `${status.ros.status.charAt(0).toUpperCase() + status.ros.status.slice(1)} · ${status.ros.sent} messages sent${status.ros.dropped ? ` · ${status.ros.dropped} dropped` : ""}`;
-    const rosLabel = {
-      disabled: "Not connected",
-      connecting: "Connecting…",
-      connected: "Bridge connected",
-      offline: "Bridge offline",
-    }[status.ros.status];
-    $("metric-ros").innerHTML =
-      `${esc(rosLabel)}<small>${status.ros.status === "connected" ? `${status.ros.sent} sent · ${status.ros.dropped} dropped` : "configure rosbridge"}</small>`;
-    if (status.inference_ms != null)
-      $("metric-latency").innerHTML =
-        `${Math.round(status.inference_ms)}<small>ms / audio window</small>`;
+    updateDiagram();
     if (status.model_status === "error") {
       $("notice").innerHTML =
         `${esc(status.model_error)} <button class="text-button" id="retry-model">Retry model download →</button>`;
@@ -330,6 +313,8 @@ async function createMicrophone(onChunk) {
   }
 }
 function setListening(active) {
+  live.frames = 0;
+  live.inferenceMs = null;
   $("listen-status").className = `status-pill ${active ? "listening" : ""}`;
   $("listen-status").innerHTML = `<i></i>${active ? "Listening" : "Standby"}`;
   $("waveform-idle").classList.toggle("hidden", active);
@@ -382,6 +367,7 @@ async function startListening() {
       }
       ackPending = true;
       ws.send(chunk.buffer);
+      diagram.send(["mic", "window"], performance.now(), { duration: 300 });
     });
     ws = new WebSocket(
       `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}/api/listen`,
@@ -421,8 +407,19 @@ async function startListening() {
           message.scores.map((item) => [item.id, item.score]),
         );
         updateScores(latestScores);
-        $("metric-latency").innerHTML =
-          `${Math.round(message.inference_ms)}<small>ms / audio window</small>`;
+        live.inferenceMs = message.inference_ms;
+        live.frames += 1;
+        live.level = message.level_db;
+        const now = performance.now();
+        diagram.send(["window", "encoder", "match"], now, { duration: 260 });
+        for (const event of message.events) {
+          live.lastEvent = event;
+          const route = ["match", "event", "journal"];
+          diagram.send(route, now + 520, { duration: 300, kind: "event" });
+          if (event.ros_delivery === "queued")
+            diagram.send(["event", "ros"], now + 820, { duration: 320, kind: "event" });
+        }
+        updateDiagram();
         for (const event of message.events) {
           document
             .querySelectorAll(`[data-cue="${event.cue_id}"]`)
@@ -887,11 +884,6 @@ async function openConnections() {
   $("connections-dialog").showModal();
 }
 $("connections-nav").onclick = openConnections;
-$("teacher-state").onclick = openConnections;
-$("about-button").onclick = () =>
-  toast(
-    "Physical Shazam · Real local CED-small detection, optional Gemini guidance, and ROS 2 events.",
-  );
 $("ros-form").onsubmit = async (event) => {
   event.preventDefault();
   try {
@@ -1048,6 +1040,147 @@ for (const dialog of document.querySelectorAll("dialog"))
         dialog.close();
     }
   });
+
+const diagramSvg = $("system-diagram");
+const diagram = new SystemDiagram(diagramSvg);
+const live = { frames: 0, inferenceMs: null, level: null, lastEvent: null };
+diagramSvg.addEventListener("click", (event) => {
+  const id = event.target.closest("[data-node]")?.dataset.node;
+  if (id === "gemini" || id === "ros") openConnections();
+  else if (id === "library") switchPage("library");
+  else if (id === "journal") switchPage("journal");
+  else if (id === "mic" && !socket && !listenPending) startListening();
+});
+function bestMatch() {
+  let best = null;
+  for (const cue of status?.cues || []) {
+    const score = latestScores.get(cue.id);
+    if (cue.enabled && score != null && (!best || score > best.score))
+      best = { name: cue.name, score, threshold: cue.threshold };
+  }
+  return best;
+}
+function updateDiagram() {
+  if (!status) return;
+  const listening = Boolean(socket) && !listenPending;
+  const model = status.model_status;
+  const encoderLabel = status.encoder.startsWith("ced") ? "CED-small" : "YAMNet";
+  const cues = status.cues || [];
+  const enabled = cues.filter((c) => c.enabled).length;
+  const best = listening ? bestMatch() : null;
+  const ros = status.ros;
+  const last = live.lastEvent || status.events[0];
+  diagram.set(
+    "mic",
+    listening ? "active" : model === "ready" ? "ready" : "idle",
+    listening
+      ? `${$("input-level").textContent}`
+      : model === "ready"
+        ? "Click to start"
+        : "Waiting for encoder",
+  );
+  diagram.set(
+    "window",
+    listening ? "active" : "idle",
+    `${status.sample_rate / 1000} kHz · ${Math.round(status.window_ms)} ms`,
+  );
+  diagram.set(
+    "encoder",
+    model === "error"
+      ? "error"
+      : model !== "ready"
+        ? "warn"
+        : listening
+          ? "active"
+          : "ready",
+    model === "error"
+      ? "Unavailable · retry"
+      : model !== "ready"
+        ? `Loading ${encoderLabel}…`
+        : listening && live.inferenceMs != null
+          ? `${encoderLabel} · ${Math.round(live.inferenceMs)} ms`
+          : `${encoderLabel} · ready`,
+  );
+  diagram.set(
+    "library",
+    cues.length ? "ready" : "warn",
+    cues.length
+      ? `${cues.length} sound${cues.length === 1 ? "" : "s"} · ${enabled} on`
+      : "Teach a sound",
+  );
+  diagram.set(
+    "gemini",
+    teacherPending ? "active" : status.teacher.configured ? "ready" : "off",
+    teacherPending
+      ? "Reviewing examples…"
+      : status.teacher.configured
+        ? "On demand"
+        : "No API key",
+  );
+  diagram.set(
+    "match",
+    !listening ? "idle" : !enabled ? "warn" : "active",
+    !listening
+      ? `${enabled} cue${enabled === 1 ? "" : "s"} armed`
+      : !enabled
+        ? "No cues enabled"
+        : best
+          ? `${best.score.toFixed(2)} · ${best.name}`
+          : "Scoring…",
+  );
+  diagram.set(
+    "event",
+    last ? "ready" : "idle",
+    last ? last.name : "Nothing yet",
+  );
+  diagram.set(
+    "journal",
+    status.events.length ? "ready" : "idle",
+    `${status.events.length} saved locally`,
+  );
+  diagram.set(
+    "ros",
+    { connected: "ready", connecting: "warn", offline: "error", disabled: "off" }[
+      ros.status
+    ] || "off",
+    {
+      connected: `${ros.sent} sent`,
+      connecting: "Connecting…",
+      offline: "Bridge offline",
+      disabled: "Not connected",
+    }[ros.status] || ros.status,
+  );
+  diagram.flow("mic", "window", listening);
+  diagram.flow("window", "encoder", listening);
+  diagram.flow("encoder", "match", listening);
+  diagram.flow("library", "match", listening && enabled > 0);
+  diagram.flow("gemini", "library", teacherPending);
+  diagram.flow("event", "ros", ros.status === "connected");
+  $("stat-latency").textContent =
+    live.inferenceMs != null
+      ? `${Math.round(live.inferenceMs)} ms`
+      : status.inference_ms != null
+        ? `${Math.round(status.inference_ms)} ms`
+        : "—";
+  $("stat-frames").textContent = listening
+    ? live.frames.toLocaleString()
+    : status.frames.toLocaleString();
+  $("stat-match").textContent = best
+    ? `${best.score.toFixed(3)} / ${best.threshold.toFixed(2)}`
+    : "—";
+  $("stat-ros").textContent =
+    ros.status === "connected"
+      ? `${ros.sent} sent · ${ros.dropped} dropped`
+      : { connecting: "Connecting…", offline: "Offline" }[ros.status] || "Off";
+  const steps = { teach: cues.length > 0, listen: listening, detect: status.events.length > 0 };
+  for (const [step, done] of Object.entries(steps))
+    $(`step-${step}`).classList.toggle("done", done);
+}
+function animateDiagram(now) {
+  diagram.frame(now);
+  requestAnimationFrame(animateDiagram);
+}
+requestAnimationFrame(animateDiagram);
 
 const canvas = $("waveform"),
   ctx = canvas.getContext("2d");

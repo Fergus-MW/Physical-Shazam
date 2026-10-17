@@ -7,7 +7,7 @@
   <img alt="uv" src="https://img.shields.io/badge/env-uv-c0e994?style=flat-square&labelColor=181c17">
   <img alt="FastAPI" src="https://img.shields.io/badge/server-FastAPI-c0e994?style=flat-square&labelColor=181c17&logo=fastapi&logoColor=c0e994">
   <img alt="CED-small" src="https://img.shields.io/badge/encoder-CED--small-c0e994?style=flat-square&labelColor=181c17&logo=pytorch&logoColor=c0e994">
-  <img alt="Gemini" src="https://img.shields.io/badge/teacher-Gemini_2.5_Flash-b8a7da?style=flat-square&labelColor=181c17&logo=googlegemini&logoColor=b8a7da">
+  <img alt="Gemini" src="https://img.shields.io/badge/teacher-Gemini_3.8_Flash-b8a7da?style=flat-square&labelColor=181c17&logo=googlegemini&logoColor=b8a7da">
   <img alt="ROS 2" src="https://img.shields.io/badge/output-ROS_2_rosbridge-c0e994?style=flat-square&labelColor=181c17&logo=ros&logoColor=c0e994">
   <img alt="Status" src="https://img.shields.io/badge/status-prototype-858e7e?style=flat-square&labelColor=181c17">
 </p>
@@ -76,7 +76,7 @@ Add your key to the local `.env` file, which Git ignores:
 
 ```dotenv
 GEMINI_API_KEY=your-key
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.8-flash
 ```
 
 The backend rereads this file for each Gemini request, so changes apply without a restart. Credentials are never returned to the browser or included in event data. You need a Gemini account with access and available quota.
@@ -98,6 +98,12 @@ The backend rereads this file for each Gemini request, so changes apply without 
 > Listening pauses while you capture enrollment or calibration audio and resumes when the dialog closes. Clear or redo calibration whenever the room changes. To use a separate workspace, run `physical-shazam --data-dir ./another-workspace serve`.
 
 ## How it works
+
+<p align="center">
+  <a href="docs/architecture.mp4"><img src="docs/architecture.gif" alt="Animated system diagram: microphone audio flows through audio windows and the local encoder into cue matching, detections go to the event journal and the ROS 2 bridge, and Gemini is an optional enrollment side path into the sound library" width="820"></a>
+</p>
+
+The dashboard shows the same diagram live: each stage lights up from the real microphone level, encoder state, best cue score, detections, ROS 2 delivery and Gemini availability. Click a stage to jump to its settings. The loop is rendered from [`docs/src/architecture.html`](docs/src/architecture.html).
 
 ```mermaid
 flowchart LR
