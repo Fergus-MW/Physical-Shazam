@@ -1,10 +1,62 @@
-# Physical Shazam
+<p align="center">
+  <img src="docs/banner.png" alt="physical shazam: few-shot environmental sound detection that listens locally" width="100%">
+</p>
 
-A working environmental sound detector with a local Python engine and a dark listening dashboard. Record 1–5 examples of a sound, optionally ask Gemini to assess them, and recognize the cue from a live microphone without sending the live stream to the cloud.
+<p align="center">
+  <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-c0e994?style=flat-square&labelColor=181c17&logo=python&logoColor=c0e994">
+  <img alt="uv" src="https://img.shields.io/badge/env-uv-c0e994?style=flat-square&labelColor=181c17">
+  <img alt="FastAPI" src="https://img.shields.io/badge/server-FastAPI-c0e994?style=flat-square&labelColor=181c17&logo=fastapi&logoColor=c0e994">
+  <img alt="YAMNet" src="https://img.shields.io/badge/encoder-YAMNet-c0e994?style=flat-square&labelColor=181c17&logo=tensorflow&logoColor=c0e994">
+  <img alt="Gemini" src="https://img.shields.io/badge/teacher-Gemini_2.5_Flash-b8a7da?style=flat-square&labelColor=181c17&logo=googlegemini&logoColor=b8a7da">
+  <img alt="ROS 2" src="https://img.shields.io/badge/output-ROS_2_rosbridge-c0e994?style=flat-square&labelColor=181c17&logo=ros&logoColor=c0e994">
+  <img alt="Status" src="https://img.shields.io/badge/status-prototype-858e7e?style=flat-square&labelColor=181c17">
+</p>
 
-## Run
+<p align="center">
+  <b>A familiar sound. A new possibility.</b><br>
+  Record 1–5 examples of a sound, optionally ask Gemini to assess them, and recognise the cue from a live microphone<br>
+  <i>without sending the live stream to the cloud.</i>
+</p>
 
-Python 3.11 is pinned. [uv](https://docs.astral.sh/uv/) manages the environment and lockfile.
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#try-it">Try it</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#ros-2-output">ROS 2 output</a> ·
+  <a href="#headless-microphone-mode">Headless mode</a> ·
+  <a href="#verification">Verification</a> ·
+  <a href="#scope">Scope</a>
+</p>
+
+<br>
+
+<p align="center">
+  <img src="docs/dashboard.jpg" alt="The Listening station dashboard: live input, learned sounds, inference time, ROS 2 bridge status and recent detections" width="100%">
+</p>
+
+## Two loops, one purpose
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>🟢 The listener <sub><code>LOCAL</code></sub></h3>
+      <b>YAMNet + your sound prototypes.</b><br>
+      A frozen Google YAMNet encoder embeds the live microphone stream on your machine and scores it against each learned cue. The live stream is never recorded or uploaded.
+    </td>
+    <td width="50%" valign="top">
+      <h3>🟣 The teacher <sub><code>ON DEMAND</code></sub></h3>
+      <b>Gemini enrollment guidance.</b><br>
+      Only when you click <b>Ask Gemini</b>, the selected enrollment examples go to Gemini, which suggests a label, audible characteristics, confusable sounds and recording advice.
+    </td>
+  </tr>
+</table>
+
+> [!NOTE]
+> The two loops are independent by design. Local enrollment and detection work without any cloud access, and starting the listener makes no cloud call.
+
+## Quick start
+
+> **Requires** Python 3.11 (pinned) and [uv](https://docs.astral.sh/uv/), which manages the environment and lockfile.
 
 ```sh
 uv sync --all-extras
@@ -12,33 +64,97 @@ cp -n .env.example .env
 uv run physical-shazam serve
 ```
 
-Open **http://127.0.0.1:8765**. The server binds to IPv4 loopback. An alternate port is supported with `serve --port 8766`.
+Open **http://127.0.0.1:8765**. The server binds to IPv4 loopback. To use another port, run `serve --port 8766`.
 
-The first launch downloads the real Google YAMNet model and warms it up. Later launches use the TensorFlow Hub cache. The dashboard shows initialization errors and a retry button. TensorFlow Hub currently needs the pinned `setuptools<81` compatibility dependency.
+The first launch downloads the real Google YAMNet model and warms it up; later launches use the TensorFlow Hub cache. The dashboard shows any initialization errors with a retry button. TensorFlow Hub currently needs the pinned `setuptools<81` compatibility dependency.
 
-Add your key to the ignored local `.env` file:
+<details>
+<summary><b>Optional: enable Gemini</b></summary>
+<br>
+
+Add your key to the local `.env` file, which Git ignores:
 
 ```dotenv
 GEMINI_API_KEY=your-key
 GEMINI_MODEL=gemini-2.5-flash
 ```
 
-The backend rereads this file for each Gemini request. Credentials are not returned to the browser or included in event data. A Gemini account with access and available quota is required; **Ask Gemini** sends only the selected enrollment examples to Google. No cloud call is made just by starting the listener.
+The backend rereads this file for each Gemini request, so changes apply without a restart. Credentials are never returned to the browser or included in event data. You need a Gemini account with access and available quota.
+
+</details>
 
 ## Try it
 
-1. Click **Or try a lab sample** to load a synthetic two-tone chime, or **Teach a sound** to record/upload your own examples. WAV, FLAC, and OGG files are supported; each clip must be 1–30 seconds and under 12 MB.
-2. Click **Ask Gemini** for a suggested label, audible characteristics, confusable sounds, and recording advice. Review the assessment, then add the sound to the library. This step is optional; local enrollment works without cloud access.
-3. Click **Start listening** and allow the browser microphone. Use the play button on a cue card to play its saved example through the speakers, or make the real sound nearby. Headphones will prevent the microphone from hearing a played reference.
-4. Inspect the live cosine similarities and event journal. **Tune cue** adjusts threshold, consecutive matching frames, and cooldown. Scores are similarities, not probabilities.
-5. In **Sound library**, optionally record five seconds of background room tone. A cue must then exceed its threshold **and** beat background similarity by 0.05. Clear or redo calibration when the room changes.
-6. **Test a recording** evaluates a file without publishing ROS messages or adding events to the journal. Try `src/physical_shazam/static/samples/two-tone-test.wav` after enrolling the lab chime, and `room-noise.wav` as a negative.
+| | Step | What happens |
+|:-:|---|---|
+| **1** | **Teach a sound**, or click **Or try a lab sample** | Record or upload 1–5 examples (WAV, FLAC or OGG; each 1–30 s and under 12 MB). The lab sample is a synthetic two-tone chime. |
+| **2** | **Ask Gemini** *(optional)* | Get a suggested label, audible characteristics, confusable sounds and recording advice. Review it, then add the sound to the library. |
+| **3** | **Start listening** | Allow the browser microphone. Press play on a cue card to play its saved example, or make the real sound nearby. Headphones stop the microphone from hearing a played reference. |
+| **4** | Watch the scores, then **Tune cue** | The dashboard shows live cosine similarities and an event journal. Tune the threshold, consecutive matching frames and cooldown. Scores are similarities, not probabilities. |
+| **5** | Calibrate the room *(optional)* | In **Sound library**, record five seconds of background room tone. A cue then has to exceed its threshold **and** beat the background similarity by 0.05. |
+| **6** | **Test a recording** | Evaluate a file without publishing ROS messages or writing to the journal. Try `src/physical_shazam/static/samples/two-tone-test.wav` after enrolling the lab chime, and `room-noise.wav` as a negative. |
 
-Listening pauses while capturing enrollment or calibration audio and resumes when that dialog closes. Enrollment clips and cue configurations persist; the live stream is not recorded. Use a separate data directory with `physical-shazam --data-dir ./another-workspace serve`.
+> [!TIP]
+> Listening pauses while you capture enrollment or calibration audio and resumes when the dialog closes. Clear or redo calibration whenever the room changes. To use a separate workspace, run `physical-shazam --data-dir ./another-workspace serve`.
+
+## How it works
+
+```mermaid
+flowchart LR
+    MIC["🎙️ Microphone<br/><sub>browser AudioWorklet<br/>or sounddevice</sub>"] --> PCM["Mono 16 kHz PCM<br/><sub>975 ms windows<br/>480 ms hop</sub>"]
+    PCM --> YAM["YAMNet encoder<br/><sub>1,024-d embedding</sub>"]
+    YAM --> SCORE{"Cosine similarity<br/><sub>per cue, independent</sub>"}
+    PROTO[("Cue prototypes<br/><sub>mean of normalized<br/>enrollment embeddings</sub>")] --> SCORE
+    BG[("Room-tone<br/>calibration")] -.-> SCORE
+    SCORE --> GATE["Silence gate · debounce<br/>cooldown · rearm"]
+    GATE --> EVT["cue.detected"]
+    EVT --> JOURNAL["Event journal<br/><sub>data/events.jsonl</sub>"]
+    EVT --> ROS["ROS 2 via rosbridge<br/><sub>/physical_shazam/events</sub>"]
+
+    ENROLL["Enrollment clips"] --> PROTO
+    ENROLL -.->|"Ask Gemini (opt-in)"| GEM["✨ Gemini<br/><sub>assessment stored with cue</sub>"]
+
+    classDef local fill:#181c17,stroke:#c0e994,color:#eeefe8
+    classDef cloud fill:#1d1a24,stroke:#b8a7da,color:#eeefe8
+    classDef out fill:#293623,stroke:#c0e994,color:#c0e994
+    class MIC,PCM,YAM,SCORE,PROTO,BG,GATE,ENROLL local
+    class GEM cloud
+    class EVT,JOURNAL,ROS out
+```
+
+### Detection defaults
+
+These are starting values; tune them with real positives and hard negatives.
+
+| Parameter | Default |
+|---|---|
+| Similarity threshold | `0.82` |
+| Matching windows to trigger | `2` |
+| Silence gate | `−55 dBFS` |
+| Cooldown | `4 s` |
+| Nonmatching windows to rearm | `2` |
+| Margin over room tone (when calibrated) | `+0.05` |
+
+<details>
+<summary><b>Engine details</b></summary>
+<br>
+
+- **Encoder.** The frozen environmental-audio encoder is [Google YAMNet](https://www.tensorflow.org/hub/tutorials/yamnet), which produces 1,024-dimensional embeddings. Enrollment averages normalized embeddings into a cue prototype. Adding a cue leaves existing prototypes intact.
+- **Windowing.** Each full 15,600-sample (975 ms) waveform covers YAMNet's 96 spectrogram frames, advancing every 7,680 samples (480 ms), and every full window is embedded. The implementation does not pretend that independent 480 ms waveforms reproduce overlapping YAMNet embeddings.
+- **Scoring.** Each cue is scored independently by cosine similarity, so multiple events can fire, but robustness to overlapping sounds still needs empirical testing.
+- **Gemini.** Gemini runs asynchronously during enrollment. Its assessment is stored with the cue to help you review recordings and choose negatives. **Gemini text is not projected into YAMNet's audio-only embedding space, and it does not train or distill the encoder.**
+- **Latency.** The measured inference time covers model execution and scoring only, not event latency. Because of the input receptive field and debounce, this is not a sub-100 ms trigger system.
+- **Frontend.** The dashboard is native HTML/CSS/JavaScript with an AudioWorklet, served by FastAPI. There is no build step. Use a current browser with AudioWorklet support. Google Fonts are loaded for typography; system fonts work offline.
+
+</details>
 
 ## ROS 2 output
 
-The Mac publishes through the rosbridge WebSocket protocol, so it does not need `rclpy`. The default topic is `/physical_shazam/events`, with type `std_msgs/msg/String`. The String's `data` field contains structured JSON:
+The Mac publishes through the rosbridge WebSocket protocol, so it doesn't need `rclpy`.
+
+| Topic | Type | Payload |
+|---|---|---|
+| `/physical_shazam/events` | `std_msgs/msg/String` | Structured JSON in the String's `data` field |
 
 ```json
 {
@@ -53,47 +169,57 @@ The Mac publishes through the rosbridge WebSocket protocol, so it does not need 
 }
 ```
 
-With no ROS system available, start the included local protocol sink in a second terminal:
+<details open>
+<summary><b>No ROS system? Use the bundled mock bridge</b></summary>
+<br>
 
 ```sh
 uv run python -m physical_shazam.mock_bridge
 ```
 
-Open **Connections**, enable ROS, enter `ws://127.0.0.1:9090`, and save. **Send test event** sends a separately typed `connection.test` message. Actual live detections appear in the sink terminal as `cue.detected`. This verifies transport and serialization; the sink **does not run a ROS graph**.
+Open **Connections**, enable ROS, enter `ws://127.0.0.1:9090` and save. **Send test event** sends a separately typed `connection.test` message, and live detections appear in the sink terminal as `cue.detected`. This verifies transport and serialization; the sink **does not run a ROS graph**.
 
-On a ROS 2 machine with `rosbridge_suite` installed:
+</details>
+
+<details>
+<summary><b>On a real ROS 2 machine</b></summary>
+<br>
+
+With `rosbridge_suite` installed:
 
 ```sh
 ros2 launch rosbridge_server rosbridge_websocket_launch.xml
 ros2 topic echo /physical_shazam/events std_msgs/msg/String
 ```
 
-Point the dashboard at that machine's bridge address. The publisher advertises the type before publishing, observes bridge error messages, and reconnects when unavailable. Its bounded queue drops stale/offline events instead of replaying old robot actions after reconnect. `queued` in the journal means handed to the publisher, and `sent` counts WebSocket writes; rosbridge does not acknowledge subscriber receipt. Validate a real subscription with `ros2 topic echo` when hardware is available. No robot movement is commanded by this prototype.
+Point the dashboard at that machine's bridge address.
 
-## Engine and scope
+</details>
 
-- The frozen environmental-audio encoder is [Google YAMNet](https://www.tensorflow.org/hub/tutorials/yamnet), with 1,024-dimensional embeddings. Enrollment averages normalized embeddings into a cue prototype; adding a cue leaves previous prototypes intact.
-- The stream is mono 16 kHz PCM. Full 15,600-sample (975 ms) waveforms cover YAMNet's 96 spectrogram frames, advancing every 7,680 samples (480 ms). Each full window is embedded. This implementation does not pretend that independent 480 ms waveforms reproduce overlapping YAMNet embeddings.
-- Each cue scores independently by cosine similarity. Defaults are 0.82 similarity, two matching windows, a silence gate at −55 dBFS, a four-second cooldown, and two nonmatching windows to rearm. These are starting values to tune with real positives and hard negatives.
-- Gemini runs asynchronously during enrollment. Its assessment is stored with the cue and helps the user review recordings and choose negatives. **Gemini text is not projected into YAMNet's audio-only embedding space and does not train or distill the encoder.**
-- Measured inference time is model execution and scoring, not event latency. The input receptive field and debounce mean this is not a sub-100 ms trigger system. Independent cue scores allow multiple events, but overlap robustness still requires empirical testing.
-- This prototype implements manual few-shot enrollment, local streaming, background rejection, cloud assessment, persistence, and event transport. Automatic novelty discovery, spatial audition/ODAS, generative augmentation, CLAP text/audio fusion, MCU compilation, and physical robot actions are future work.
-- The model is small compared with a foundation model; the Python/TensorFlow runtime is not an MCU deployment. The encoder-independent core can be reused for a lighter runtime later. Raspberry Pi deployment and real household accuracy have not been measured.
+**Delivery semantics:**
 
-The dashboard uses native HTML/CSS/JavaScript and an AudioWorklet, served by FastAPI. There is no frontend build step. Use a current browser with AudioWorklet support. It loads Google Fonts for typography; system fonts work offline. Bind to loopback for local development; this app has no multiuser authentication.
+- The publisher advertises the type before publishing, watches for bridge error messages, and reconnects when the bridge is unavailable.
+- Its bounded queue drops stale and offline events rather than replaying old robot actions after a reconnect.
+- In the journal, `queued` means the event was handed to the publisher and `sent` counts WebSocket writes. Rosbridge does not acknowledge subscriber receipt, so validate a real subscription with `ros2 topic echo`.
+
+> [!IMPORTANT]
+> This prototype does not command any robot movement.
 
 ## Headless microphone mode
 
-Enroll in the dashboard first, then stop that server before running the headless engine on the same data directory:
+Enroll cues in the dashboard first, then stop that server before running the headless engine on the same data directory:
 
 ```sh
 uv sync --all-extras
 uv run physical-shazam listen
-# Or select a sounddevice device index/name:
+# Or pick a sounddevice device by index or name:
 uv run physical-shazam listen --device 0
 ```
 
-This captures using PortAudio/sounddevice, keeps inference outside the audio callback, writes the same event log, and uses the saved ROS configuration. On Linux, PortAudio may need to be installed through the OS package manager. Run one process per data directory. Headless mode loads cues at startup; live dashboard enrollment updates the dashboard server's detector immediately.
+This mode captures audio with PortAudio/sounddevice, keeps inference outside the audio callback, writes the same event log, and uses the saved ROS configuration. On Linux, you may need to install PortAudio through the OS package manager.
+
+> [!WARNING]
+> Run one process per data directory. Headless mode loads cues at startup, whereas enrolling in the dashboard updates the dashboard server's detector immediately.
 
 ## Verification
 
@@ -104,10 +230,63 @@ node --test tests/audio_worklet.test.mjs
 uv run python scripts/smoke_test.py
 ```
 
-The 15 Python unit/integration tests cover stream boundaries, resampling, cue persistence, independent matches, debounce/rearm/cooldown, silence/background rejection, API errors, a mocked Gemini request, and a real local rosbridge wire exchange. These tests inject an encoder double where recognition accuracy is irrelevant. The Node test verifies that the actual AudioWorklet preserves all PCM samples across chunk boundaries and final recording flush, including stereo downmixing.
+| Suite | What it covers |
+|---|---|
+| **pytest** (15 tests) | Stream boundaries, resampling, cue persistence, independent matches, debounce/rearm/cooldown, silence and background rejection, API errors, a mocked Gemini request, and a real local rosbridge wire exchange. These tests inject an encoder double where recognition accuracy doesn't matter. |
+| **Node AudioWorklet test** | The actual AudioWorklet preserves every PCM sample across chunk boundaries and the final recording flush, including stereo downmixing. |
+| **`smoke_test.py`** | Runs the **real pretrained YAMNet** through enrollment, synthetic streaming positives, a noise negative, persisted detection events and a WebSocket bridge sink, in an isolated temporary workspace. |
 
-`smoke_test.py` separately runs the **real pretrained YAMNet** through enrollment, synthetic streaming positives, a noise negative, persisted detection events, and a WebSocket bridge sink in an isolated temporary workspace. On the development Mac it detected both replayed chimes, rejected the noise fixture, and measured about 3 ms median inference per window. This is a synthetic integration check, not a benchmark of household recall, false accepts/hour, or real ROS delivery. A live Gemini audio assessment was also verified during development.
+On the development Mac, the smoke test detected both replayed chimes, rejected the noise fixture, and measured about **3 ms median inference per window**. This is a synthetic integration check, not a benchmark of household recall, false accepts per hour, or real ROS delivery. A live Gemini audio assessment was also verified during development.
 
-Stored files are ignored by Git: `data/cues.json`, `data/examples/<cue-id>/*.wav`, `data/events.jsonl`, and `data/ros.json`. Deleting a cue removes its saved examples. `.env` is ignored separately.
+## Data and privacy
 
-API routes and request schemas are available at **http://127.0.0.1:8765/docs**. Implementation references: [YAMNet](https://www.tensorflow.org/hub/tutorials/yamnet), [Gemini audio](https://ai.google.dev/gemini-api/docs/audio), [structured responses](https://ai.google.dev/gemini-api/docs/structured-output), and the [ROS 2 rosbridge protocol](https://github.com/RobotWebTools/rosbridge_suite/blob/ros2/ROSBRIDGE_PROTOCOL.md).
+| File | Contents |
+|---|---|
+| `data/cues.json` | Learned cues and their configuration |
+| `data/examples/<cue-id>/*.wav` | Saved enrollment clips (removed when you delete the cue) |
+| `data/events.jsonl` | Event journal |
+| `data/ros.json` | ROS connection settings |
+| `.env` | Gemini credentials |
+
+All of these are ignored by Git. Enrollment clips and cue configurations persist, but the live stream is never recorded. The app has no multiuser authentication, so keep it bound to loopback during local development. API routes and request schemas are at **http://127.0.0.1:8765/docs**.
+
+## Scope
+
+<table>
+  <tr>
+    <th width="50%">✅ Implemented</th>
+    <th width="50%">🔭 Future work</th>
+  </tr>
+  <tr>
+    <td valign="top">
+      <ul>
+        <li>Manual few-shot enrollment</li>
+        <li>Local streaming recognition</li>
+        <li>Background rejection</li>
+        <li>Cloud assessment (Gemini)</li>
+        <li>Persistence</li>
+        <li>Event transport (ROS 2 via rosbridge)</li>
+      </ul>
+    </td>
+    <td valign="top">
+      <ul>
+        <li>Automatic novelty discovery</li>
+        <li>Spatial audition / ODAS</li>
+        <li>Generative augmentation</li>
+        <li>CLAP text/audio fusion</li>
+        <li>MCU compilation</li>
+        <li>Physical robot actions</li>
+      </ul>
+    </td>
+  </tr>
+</table>
+
+The model is small compared with a foundation model, but the Python/TensorFlow runtime is not an MCU deployment. The encoder-independent core can be reused for a lighter runtime later. Raspberry Pi deployment and real household accuracy have not been measured.
+
+## References
+
+[YAMNet](https://www.tensorflow.org/hub/tutorials/yamnet) · [Gemini audio](https://ai.google.dev/gemini-api/docs/audio) · [Gemini structured output](https://ai.google.dev/gemini-api/docs/structured-output) · [ROS 2 rosbridge protocol](https://github.com/RobotWebTools/rosbridge_suite/blob/ros2/ROSBRIDGE_PROTOCOL.md)
+
+<br>
+
+<p align="center"><sub>physical shazam · learning to listen · built for the sounds around you</sub></p>
