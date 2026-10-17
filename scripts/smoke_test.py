@@ -1,4 +1,4 @@
-"""Run real YAMNet -> enrollment -> streaming -> rosbridge in an isolated workspace."""
+"""Run real CED-small -> enrollment -> streaming -> rosbridge in an isolated workspace."""
 
 import json
 import queue
@@ -71,7 +71,7 @@ def main():
             assert delivered["type"] == "cue.detected"
             assert delivered["cue_id"] == response.json()["id"]
             report = {
-                "encoder": "YAMNet (real pretrained model)",
+                "encoder": "CED-small (real pretrained model)",
                 "examples": 1,
                 "positive_events": len(events),
                 "negative_events": len(negative_result["events"]),

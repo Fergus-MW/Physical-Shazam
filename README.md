@@ -6,7 +6,7 @@
   <img alt="Python 3.11" src="https://img.shields.io/badge/python-3.11-c0e994?style=flat-square&labelColor=181c17&logo=python&logoColor=c0e994">
   <img alt="uv" src="https://img.shields.io/badge/env-uv-c0e994?style=flat-square&labelColor=181c17">
   <img alt="FastAPI" src="https://img.shields.io/badge/server-FastAPI-c0e994?style=flat-square&labelColor=181c17&logo=fastapi&logoColor=c0e994">
-  <img alt="YAMNet" src="https://img.shields.io/badge/encoder-YAMNet-c0e994?style=flat-square&labelColor=181c17&logo=tensorflow&logoColor=c0e994">
+  <img alt="CED-small" src="https://img.shields.io/badge/encoder-CED--small-c0e994?style=flat-square&labelColor=181c17&logo=pytorch&logoColor=c0e994">
   <img alt="Gemini" src="https://img.shields.io/badge/teacher-Gemini_3.8_Flash-b8a7da?style=flat-square&labelColor=181c17&logo=googlegemini&logoColor=b8a7da">
   <img alt="ROS 2" src="https://img.shields.io/badge/output-ROS_2_rosbridge-c0e994?style=flat-square&labelColor=181c17&logo=ros&logoColor=c0e994">
   <img alt="Status" src="https://img.shields.io/badge/status-prototype-858e7e?style=flat-square&labelColor=181c17">
@@ -40,8 +40,8 @@
   <tr>
     <td width="50%" valign="top">
       <h3>🟢 The listener <sub><code>LOCAL</code></sub></h3>
-      <b>YAMNet + your sound prototypes.</b><br>
-      A frozen Google YAMNet encoder embeds the live microphone stream on your machine and scores it against each learned cue. The live stream is never recorded or uploaded.
+      <b>CED-small + your sound prototypes.</b><br>
+      A frozen CED-small audio transformer embeds the live microphone stream on your machine and scores it against each learned cue. The live stream is never recorded or uploaded.
     </td>
     <td width="50%" valign="top">
       <h3>🟣 The teacher <sub><code>ON DEMAND</code></sub></h3>
@@ -66,7 +66,7 @@ uv run physical-shazam serve
 
 Open **http://127.0.0.1:8765**. The server binds to IPv4 loopback. To use another port, run `serve --port 8766`.
 
-The first launch downloads the real Google YAMNet model and warms it up; later launches use the TensorFlow Hub cache. The dashboard shows any initialization errors with a retry button. TensorFlow Hub currently needs the pinned `setuptools<81` compatibility dependency.
+The first launch downloads [CED-small](https://huggingface.co/mispeech/ced-small) (Apache-2.0, pinned to a fixed Hugging Face revision) and warms it up; later launches use the Hugging Face cache. The dashboard shows any initialization errors with a retry button. PyTorch comes from the CPU-only wheel index, so no CUDA libraries are installed.
 
 <details>
 <summary><b>Optional: enable Gemini</b></summary>
@@ -108,7 +108,7 @@ The dashboard shows the same diagram live: each stage lights up from the real mi
 ```mermaid
 flowchart LR
     MIC["🎙️ Microphone<br/><sub>browser AudioWorklet<br/>or sounddevice</sub>"] --> PCM["Mono 16 kHz PCM<br/><sub>975 ms windows<br/>480 ms hop</sub>"]
-    PCM --> YAM["YAMNet encoder<br/><sub>1,024-d embedding</sub>"]
+    PCM --> YAM["CED-small encoder<br/><sub>384-d centred embedding</sub>"]
     YAM --> SCORE{"Cosine similarity<br/><sub>per cue, independent</sub>"}
     PROTO[("Cue prototypes<br/><sub>mean of normalized<br/>enrollment embeddings</sub>")] --> SCORE
     BG[("Room-tone<br/>calibration")] -.-> SCORE
@@ -134,7 +134,7 @@ These are starting values; tune them with real positives and hard negatives.
 
 | Parameter | Default |
 |---|---|
-| Similarity threshold | `0.82` |
+| Similarity threshold | `0.65` |
 | Matching windows to trigger | `2` |
 | Silence gate | `−55 dBFS` |
 | Cooldown | `4 s` |
@@ -145,10 +145,11 @@ These are starting values; tune them with real positives and hard negatives.
 <summary><b>Engine details</b></summary>
 <br>
 
-- **Encoder.** The frozen environmental-audio encoder is [Google YAMNet](https://www.tensorflow.org/hub/tutorials/yamnet), which produces 1,024-dimensional embeddings. Enrollment averages normalized embeddings into a cue prototype. Adding a cue leaves existing prototypes intact.
-- **Windowing.** Each full 15,600-sample (975 ms) waveform covers YAMNet's 96 spectrogram frames, advancing every 7,680 samples (480 ms), and every full window is embedded. The implementation does not pretend that independent 480 ms waveforms reproduce overlapping YAMNet embeddings.
+- **Encoder.** The frozen environmental-audio encoder is [CED-small](https://huggingface.co/mispeech/ced-small), an AudioSet-trained audio transformer. Its token embeddings are mean-pooled to 384 dimensions, then centred by subtracting the mean embedding of fixed synthetic reference signals (noise, tones, clicks and sweeps). Centring spreads cosine scores apart; otherwise they bunch near 1. Enrollment averages normalized embeddings into a cue prototype. Adding a cue leaves existing prototypes intact. In a few-shot ESC-50 check (975 ms windows, cosine to prototype), CED-small detected 75% of target clips at 1% false alarms, versus 68% for the previous YAMNet encoder, at about 10 ms per window on two CPU threads.
+- **Encoder upgrades.** If `cues.json` was written by another encoder, startup backs it up as `cues.<old-encoder>.json` and re-embeds each cue from its saved `examples/<cue-id>/*.wav`. Thresholds reset to the new default, and room calibration is cleared, so record it again.
+- **Windowing.** Each full 15,600-sample (975 ms) waveform is one encoder input, advancing every 7,680 samples (480 ms), and every full window is embedded. The implementation does not pretend that independent 480 ms waveforms reproduce overlapping-window embeddings.
 - **Scoring.** Each cue is scored independently by cosine similarity, so multiple events can fire, but robustness to overlapping sounds still needs empirical testing.
-- **Gemini.** Gemini runs asynchronously during enrollment. Its assessment is stored with the cue to help you review recordings and choose negatives. **Gemini text is not projected into YAMNet's audio-only embedding space, and it does not train or distill the encoder.**
+- **Gemini.** Gemini runs asynchronously during enrollment. Its assessment is stored with the cue to help you review recordings and choose negatives. **Gemini text is not projected into the encoder's audio-only embedding space, and it does not train or distill the encoder.**
 - **Latency.** The measured inference time covers model execution and scoring only, not event latency. Because of the input receptive field and debounce, this is not a sub-100 ms trigger system.
 - **Frontend.** The dashboard is native HTML/CSS/JavaScript with an AudioWorklet, served by FastAPI. There is no build step. Use a current browser with AudioWorklet support. Google Fonts are loaded for typography; system fonts work offline.
 
@@ -240,7 +241,7 @@ uv run python scripts/smoke_test.py
 |---|---|
 | **pytest** (27 tests) | Stream boundaries, resampling, cue persistence, independent matches, debounce/rearm/cooldown, silence and background rejection, malformed WebSocket frames, API errors, Gemini failures and response validation, and a real local rosbridge wire exchange. These tests inject an encoder double where recognition accuracy doesn't matter. |
 | **Node** (8 tests) | Real HTML element references, cancellation during uploads/recording, concurrent upload limits, stale teacher/save responses, microphone permission resolving after cancellation, and AudioWorklet PCM preservation across chunk boundaries and final flush. |
-| **`smoke_test.py`** | Runs the **real pretrained YAMNet** through enrollment, synthetic streaming positives, a noise negative, persisted detection events and a WebSocket bridge sink, in an isolated temporary workspace. |
+| **`smoke_test.py`** | Runs the **real pretrained CED-small** through enrollment, synthetic streaming positives, a noise negative, persisted detection events and a WebSocket bridge sink, in an isolated temporary workspace. |
 
 Dashboard workflow tests use an isolated DOM/network harness; the sample enrollment flow was also checked in Chrome. Actual microphone capture still requires browser permission.
 
@@ -289,11 +290,11 @@ All of these are ignored by Git. Enrollment clips and cue configurations persist
   </tr>
 </table>
 
-The model is small compared with a foundation model, but the Python/TensorFlow runtime is not an MCU deployment. The encoder-independent core can be reused for a lighter runtime later. Raspberry Pi deployment and real household accuracy have not been measured.
+The model is small compared with a foundation model, but the Python/PyTorch runtime is not an MCU deployment. The encoder-independent core can be reused for a lighter runtime later. Raspberry Pi deployment and real household accuracy have not been measured.
 
 ## References
 
-[YAMNet](https://www.tensorflow.org/hub/tutorials/yamnet) · [Gemini audio](https://ai.google.dev/gemini-api/docs/audio) · [Gemini structured output](https://ai.google.dev/gemini-api/docs/structured-output) · [ROS 2 rosbridge protocol](https://github.com/RobotWebTools/rosbridge_suite/blob/ros2/ROSBRIDGE_PROTOCOL.md)
+[CED](https://huggingface.co/mispeech/ced-small) · [Gemini audio](https://ai.google.dev/gemini-api/docs/audio) · [Gemini structured output](https://ai.google.dev/gemini-api/docs/structured-output) · [ROS 2 rosbridge protocol](https://github.com/RobotWebTools/rosbridge_suite/blob/ros2/ROSBRIDGE_PROTOCOL.md)
 
 <br>
 

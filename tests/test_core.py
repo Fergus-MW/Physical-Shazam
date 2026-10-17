@@ -40,7 +40,7 @@ def test_learning_a_second_cue_preserves_the_first_across_restart(tmp_path):
 
 
 def test_detector_rejects_spikes_latches_and_rearms_after_release(tmp_path):
-    store = CueStore(tmp_path)
+    store = CueStore(tmp_path, "test")
     cue = store.add("Door", [[1, 0]])
     detector = Detector(store)
     assert not detector.score([1, 0], 0)[1]
@@ -55,7 +55,7 @@ def test_detector_rejects_spikes_latches_and_rearms_after_release(tmp_path):
 
 
 def test_background_silence_and_disabled_cues_cannot_trigger(tmp_path):
-    store = CueStore(tmp_path)
+    store = CueStore(tmp_path, "test")
     cue = store.add("Hum", [[1, 0]])
     store.update(cue["id"], {"hits": 1})
     store.calibrate([1, 0])
@@ -67,7 +67,7 @@ def test_background_silence_and_disabled_cues_cannot_trigger(tmp_path):
 
 
 def test_scores_are_independent_not_winner_take_all(tmp_path):
-    store = CueStore(tmp_path)
+    store = CueStore(tmp_path, "test")
     for name in ["Door", "Bell"]:
         cue = store.add(name, [[1, 0]])
         store.update(cue["id"], {"hits": 1})
@@ -76,7 +76,7 @@ def test_scores_are_independent_not_winner_take_all(tmp_path):
 
 
 def test_cooldown_blocks_another_event_after_the_detector_rearms(tmp_path):
-    store = CueStore(tmp_path)
+    store = CueStore(tmp_path, "test")
     cue = store.add("Door", [[1, 0]])
     store.update(cue["id"], {"hits": 1, "cooldown": 4})
     detector = Detector(store)
@@ -86,3 +86,42 @@ def test_cooldown_blocks_another_event_after_the_detector_rearms(tmp_path):
     assert not detector.score([1, 0], 2.5)[1]
     assert not detector.score([1, 0], 4.9)[1]
     assert len(detector.score([1, 0], 5)[1]) == 1
+
+
+def test_encoder_change_reembeds_saved_examples(tmp_path):
+    import json
+
+    import pytest
+
+    from physical_shazam.audio import SAMPLE_RATE, wav_bytes
+    from physical_shazam.core import DEFAULT_THRESHOLD
+
+    old = CueStore(tmp_path, "old-encoder")
+    cue = old.add("Chime", [np.array([1.0, 0.0])], threshold=0.9)
+    old.calibrate(np.array([0.0, 1.0]))
+    folder = tmp_path / "examples" / cue["id"]
+    folder.mkdir(parents=True)
+    tone = np.sin(np.arange(SAMPLE_RATE) / 5).astype(np.float32) * 0.3
+    (folder / "1.wav").write_bytes(wav_bytes(tone))
+
+    with pytest.raises(ValueError):
+        CueStore(tmp_path, "new-encoder")
+    store = CueStore(tmp_path, "new-encoder", migrate=True)
+    assert store.pending_migration is not None and not store.snapshot()
+    calls = []
+    result = store.migrate(lambda samples: calls.append(len(samples)) or np.array([0.0, 2.0, 0.0]))
+
+    assert calls == [SAMPLE_RATE]
+    assert result == {
+        "from": "old-encoder",
+        "cues": 1,
+        "skipped": [],
+        "backup": "cues.old-encoder.json",
+    }
+    restored = CueStore(tmp_path, "new-encoder")
+    [migrated] = restored.snapshot()
+    assert migrated["id"] == cue["id"] and migrated["name"] == "Chime"
+    assert migrated["prototype"] == [0.0, 1.0, 0.0]
+    assert migrated["threshold"] == DEFAULT_THRESHOLD
+    assert restored.background is None
+    assert json.loads((tmp_path / "cues.old-encoder.json").read_text())["encoder"] == "old-encoder"
