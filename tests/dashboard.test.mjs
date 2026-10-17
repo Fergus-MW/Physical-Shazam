@@ -11,6 +11,10 @@ const html = readFileSync(
   new URL("../src/physical_shazam/static/index.html", import.meta.url),
   "utf8",
 );
+const diagramSource = readFileSync(
+  new URL("../src/physical_shazam/static/diagram.js", import.meta.url),
+  "utf8",
+);
 const elementIds = new Set(
   [...`${html}\n${source}`.matchAll(/\bid="([^"]+)"/g)].map(
     (match) => match[1],
@@ -41,6 +45,12 @@ async function dashboard() {
       this.dataset = {};
       this.listeners = new Map();
       this.style = {};
+      this.style.setProperty = (name, value) => {
+        this.style[name] = value;
+      };
+      this.children = [];
+      this.attributes = {};
+      this.textContent = "";
       const classes = new Set();
       this.classList = {
         add: (name) => classes.add(name),
@@ -65,6 +75,27 @@ async function dashboard() {
     getContext() {
       return {};
     }
+    setAttribute(name, value) {
+      this.attributes[name] = String(value);
+    }
+    appendChild(child) {
+      child.parentNode = this;
+      this.children.push(child);
+    }
+    replaceChildren() {
+      this.children = [];
+    }
+    remove() {
+      this.parentNode.children = this.parentNode.children.filter(
+        (child) => child !== this,
+      );
+    }
+    getTotalLength() {
+      return 100;
+    }
+    getPointAtLength(length) {
+      return { x: length, y: 0 };
+    }
   }
   const get = (id) => {
     if (!elementIds.has(id)) return null;
@@ -72,6 +103,10 @@ async function dashboard() {
     return elements.get(id);
   };
   const status = {
+    encoder: "ced-small-test",
+    sample_rate: 16000,
+    window_ms: 975,
+    frames: 0,
     model_status: "ready",
     teacher: { configured: false, model: "test" },
     ros: { status: "disabled", sent: 0, dropped: 0 },
@@ -81,7 +116,11 @@ async function dashboard() {
   };
   let respond = async () => ({});
   const context = vm.createContext({
-    document: { getElementById: get, querySelectorAll: () => [] },
+    document: {
+      getElementById: get,
+      querySelectorAll: () => [],
+      createElementNS: () => new Element(),
+    },
     window: { addEventListener() {} },
     setInterval() {},
     requestAnimationFrame() {},
@@ -98,7 +137,15 @@ async function dashboard() {
       return { ok: true, json: async () => result };
     },
   });
-  vm.runInContext(source, context);
+  // Evaluate both real modules in one isolated lexical scope; the harness supplies SVG geometry.
+  vm.runInContext(diagramSource.replace(/^export /gm, ""), context);
+  vm.runInContext(
+    source.replace(
+      /^import \{ SystemDiagram \} from "\/static\/diagram.js";\s*/,
+      "",
+    ),
+    context,
+  );
   await new Promise(setImmediate);
   return {
     get,
@@ -110,6 +157,23 @@ async function dashboard() {
     context,
   };
 }
+
+test("the system diagram reflects CED-small and clears completed audio packets", async () => {
+  const app = await dashboard();
+  assert.equal(
+    app.run("diagram.nodes.encoder.value.textContent"),
+    "CED-small · ready",
+  );
+  assert.equal(app.run("diagram.nodes.encoder.state"), "ready");
+  app.run(
+    "diagram.send(['mic','window','encoder'],0,{duration:100});diagram.frame(50)",
+  );
+  assert.equal(app.run("diagram.packets.length"), 1);
+  app.run("diagram.frame(250)");
+  assert.equal(app.run("diagram.packets.length"), 0);
+  assert.equal(app.run("diagram.packetLayer.children.length"), 0);
+  assert.ok(Number(app.run("diagram.nodes.encoder.g.style['--flash']")) > 0);
+});
 
 test("a completed upload cannot enter a different enrollment after cancellation", async () => {
   const app = await dashboard(),

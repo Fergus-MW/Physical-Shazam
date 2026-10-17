@@ -21,10 +21,9 @@ def wait_until(predicate, seconds=4):
     raise AssertionError("Condition was not reached")
 
 
-def test_gemini_sends_actual_wav_audio_and_validates_result(monkeypatch):
-    monkeypatch.setattr(
-        teacher, "settings", lambda: {"key": "test-key", "model": "gemini-3.8-flash"}
-    )
+@pytest.mark.parametrize("model", ["gemini-3.8-flash", "gemini-2.5-flash"])
+def test_gemini_sends_actual_wav_audio_and_validates_result(monkeypatch, model):
+    monkeypatch.setattr(teacher, "settings", lambda: {"key": "test-key", "model": model})
     assessment = {
         "label": "Chime",
         "description": "Two falling tones.",
@@ -39,7 +38,10 @@ def test_gemini_sends_actual_wav_audio_and_validates_result(monkeypatch):
         payload = json.loads(request.content)
         assert payload["contents"][0]["parts"][1]["inlineData"]["mimeType"] == "audio/wav"
         assert payload["generationConfig"]["responseMimeType"] == "application/json"
-        assert payload["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "LOW"}
+        if model.startswith("gemini-3"):
+            assert payload["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "LOW"}
+        else:
+            assert "thinkingConfig" not in payload["generationConfig"]
         assert "temperature" not in payload["generationConfig"]
         return httpx.Response(
             200, json={"candidates": [{"content": {"parts": [{"text": json.dumps(assessment)}]}}]}
@@ -53,7 +55,7 @@ def test_gemini_sends_actual_wav_audio_and_validates_result(monkeypatch):
     )
     result = teacher.analyze([np.ones(16000, dtype=np.float32) * 0.1])
     assert result["label"] == "Chime"
-    assert result["model"] == "gemini-3.8-flash"
+    assert result["model"] == model
 
 
 @pytest.mark.parametrize(

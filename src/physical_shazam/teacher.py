@@ -59,9 +59,10 @@ def analyze(samples, label=""):
         "generationConfig": {
             "responseMimeType": "application/json",
             "responseJsonSchema": Teaching.model_json_schema(),
-            "thinkingConfig": {"thinkingLevel": "LOW"},
         },
     }
+    if config["model"].startswith("gemini-3"):
+        body["generationConfig"]["thinkingConfig"] = {"thinkingLevel": "LOW"}
     try:
         with httpx.Client(timeout=90) as client:
             response = client.post(
