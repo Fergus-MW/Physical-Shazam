@@ -1,0 +1,607 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#101310" />
+    <title>Physical Shazam · Listening station</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script type="module" src="/static/app.js"></script>
+  </head>
+  <body>
+    <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <symbol id="i-wave" viewBox="0 0 24 24">
+          <path d="M3 10v4m4-7v10m5-14v18m5-14v10m4-7v4" />
+        </symbol>
+        <symbol id="i-grid" viewBox="0 0 24 24">
+          <rect x="3" y="3" width="7" height="7" rx="2" />
+          <rect x="14" y="3" width="7" height="7" rx="2" />
+          <rect x="3" y="14" width="7" height="7" rx="2" />
+          <rect x="14" y="14" width="7" height="7" rx="2" />
+        </symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </symbol>
+        <symbol id="i-link" viewBox="0 0 24 24">
+          <path
+            d="m10 14 4-4m-6 6-1 1a4.2 4.2 0 0 1-6-6l4-4a4.2 4.2 0 0 1 6 0m2 2 1-1a4.2 4.2 0 0 1 6 6l-4 4a4.2 4.2 0 0 1-6 0"
+            transform="translate(1 -1)"
+          />
+        </symbol>
+        <symbol id="i-plus" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24">
+          <path d="M5 12h14m-5-5 5 5-5 5" />
+        </symbol>
+        <symbol id="i-mic" viewBox="0 0 24 24">
+          <rect x="9" y="2" width="6" height="13" rx="3" />
+          <path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8" />
+        </symbol>
+        <symbol id="i-chip" viewBox="0 0 24 24">
+          <rect x="6" y="6" width="12" height="12" rx="3" />
+          <path d="M9 1v5m6-5v5M9 18v5m6-5v5M1 9h5m-5 6h5M18 9h5m-5 6h5" />
+          <path d="M10 10h4v4h-4z" />
+        </symbol>
+        <symbol id="i-cloud" viewBox="0 0 24 24">
+          <path
+            d="M7 18h11a4 4 0 0 0 1-7.9 7 7 0 0 0-13.6-1A4.5 4.5 0 0 0 7 18Z"
+          />
+        </symbol>
+        <symbol id="i-bell" viewBox="0 0 24 24">
+          <path d="M5 17h14l-2-3V9a5 5 0 0 0-10 0v5zm5 4h4M12 2v2" />
+        </symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24">
+          <path d="M12 16V3m-5 5 5-5 5 5M4 16v5h16v-5" />
+        </symbol>
+        <symbol id="i-check" viewBox="0 0 24 24">
+          <path d="m5 12 4 4L19 6" />
+        </symbol>
+        <symbol id="i-close" viewBox="0 0 24 24">
+          <path d="m6 6 12 12M6 18 18 6" />
+        </symbol>
+        <symbol id="i-sliders" viewBox="0 0 24 24">
+          <path d="M4 7h16M4 17h16" />
+          <circle cx="9" cy="7" r="3" />
+          <circle cx="15" cy="17" r="3" />
+        </symbol>
+        <symbol id="i-play" viewBox="0 0 24 24">
+          <path d="m8 4 12 8-12 8Z" />
+        </symbol>
+      </defs>
+    </svg>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="Physical Shazam home"
+        ><span class="brand-mark"
+          ><svg><use href="#i-wave" /></svg></span
+        ><span
+          >physical<span class="brand-second"
+            >shazam<span class="brand-dot">.</span></span
+          ></span
+        ></a
+      >
+      <div class="workspace">
+        <span class="workspace-icon">P</span>
+        <div>Personal workspace<small>LOCAL PROTOTYPE</small></div>
+        <span class="workspace-chevron">⌄</span>
+      </div>
+      <div class="nav-label">WORKSPACE</div>
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" data-page="station">
+          <svg><use href="#i-wave" /></svg>Listening station<span
+            class="nav-dot"
+          ></span>
+        </button>
+        <button class="nav-item" data-page="library">
+          <svg><use href="#i-grid" /></svg>Sound library<span
+            class="nav-count"
+            id="nav-count"
+            >0</span
+          >
+        </button>
+        <button class="nav-item" data-page="journal">
+          <svg><use href="#i-clock" /></svg>Event journal
+        </button>
+        <button class="nav-item" id="connections-nav">
+          <svg><use href="#i-link" /></svg>Connections
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="local-note">
+          <svg><use href="#i-chip" /></svg>
+          <div>
+            Small model. Always local.
+            <p>Cloud intelligence, only<br />when you ask for it.</p>
+          </div>
+        </div>
+        <button class="station-id" id="about-button">
+          <span class="avatar">PS</span
+          ><span>Laptop station<small>Development workspace</small></span
+          ><span>↗</span>
+        </button>
+      </div>
+    </aside>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="breadcrumb">
+          Workspace<span>/</span
+          ><strong id="breadcrumb-current">Listening station</strong>
+        </div>
+        <div class="topbar-right">
+          <span class="local-badge"><i></i> Local inference</span
+          ><span class="version">PROTOTYPE / 01</span>
+        </div>
+      </header>
+      <main>
+        <section class="page-heading">
+          <div>
+            <div class="eyebrow">
+              <span class="tiny-line"></span> AMBIENT INTELLIGENCE
+            </div>
+            <h1 id="page-title">Listening station</h1>
+            <p id="page-description">A familiar sound. A new possibility.</p>
+          </div>
+          <button class="button primary teach-button">
+            <svg><use href="#i-plus" /></svg>Teach a sound
+          </button>
+        </section>
+        <div id="notice" class="notice hidden" role="status"></div>
+
+        <section id="station-page" class="page-content">
+          <div class="station-grid">
+            <section class="panel monitor-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="overline">LIVE INPUT</span>
+                  <h2>Your acoustic space</h2>
+                </div>
+                <span class="status-pill" id="listen-status"
+                  ><i></i>Standby</span
+                >
+              </div>
+              <div class="waveform-wrap">
+                <div class="waveform-grid"></div>
+                <canvas
+                  id="waveform"
+                  aria-label="Live microphone waveform"
+                ></canvas>
+                <div class="waveform-idle" id="waveform-idle">
+                  <span class="mic-orbit"
+                    ><svg><use href="#i-mic" /></svg></span
+                  ><span
+                    >Your space has a story.<small
+                      >Start listening to hear what happens.</small
+                    ></span
+                  >
+                </div>
+                <div class="waveform-label">
+                  <span>WAVEFORM / MONO</span
+                  ><span id="input-level">— dBFS</span>
+                </div>
+              </div>
+              <div class="monitor-footer">
+                <div class="source-label">
+                  <span class="source-icon"
+                    ><svg><use href="#i-mic" /></svg
+                  ></span>
+                  <div id="mic-name">
+                    System microphone<small
+                      >16 kHz processing · 480 ms hop</small
+                    >
+                  </div>
+                </div>
+                <button class="button primary" id="listen-button">
+                  <svg><use href="#i-play" /></svg><span>Start listening</span>
+                </button>
+              </div>
+            </section>
+            <section class="panel engine-panel">
+              <div class="panel-heading">
+                <div>
+                  <span class="overline">BEHIND THE LISTENING</span>
+                  <h2>Two loops. One purpose.</h2>
+                </div>
+                <svg class="muted-icon"><use href="#i-chip" /></svg>
+              </div>
+              <div class="engine-item">
+                <div class="engine-icon mint">
+                  <svg><use href="#i-wave" /></svg>
+                </div>
+                <div>
+                  <div class="engine-title">
+                    The listener<span class="tag">LOCAL</span>
+                  </div>
+                  <p>YAMNet + your sound prototypes</p>
+                  <span class="engine-state" id="model-state"
+                    ><i></i>Loading audio encoder…</span
+                  >
+                </div>
+              </div>
+              <div class="engine-divider">
+                <span></span>independent by design<span></span>
+              </div>
+              <div class="engine-item">
+                <div class="engine-icon lavender">
+                  <svg><use href="#i-cloud" /></svg>
+                </div>
+                <div>
+                  <div class="engine-title">
+                    The teacher<span class="tag">ON DEMAND</span>
+                  </div>
+                  <p>Gemini · enrollment guidance</p>
+                  <button class="inline-link" id="teacher-state">
+                    Set up your API key ↗
+                  </button>
+                </div>
+              </div>
+              <div class="engine-foot">
+                <i></i>Live microphone audio stays on this machine.
+              </div>
+            </section>
+          </div>
+          <section class="metrics" aria-label="Station metrics">
+            <div class="metric">
+              <span
+                >Learned sounds<svg><use href="#i-grid" /></svg></span
+              ><strong id="metric-cues">0<small>in your library</small></strong>
+            </div>
+            <div class="metric">
+              <span
+                >Inference time<svg><use href="#i-chip" /></svg></span
+              ><strong id="metric-latency"
+                >—<small>waiting for audio</small></strong
+              >
+            </div>
+            <div class="metric">
+              <span
+                >Detected events<svg><use href="#i-bell" /></svg></span
+              ><strong id="metric-events"
+                >0<small>in recent history</small></strong
+              >
+            </div>
+            <div class="metric">
+              <span
+                >ROS 2 output<svg><use href="#i-link" /></svg></span
+              ><strong class="metric-text" id="metric-ros"
+                >Not connected<small>configure rosbridge</small></strong
+              >
+            </div>
+          </section>
+          <div class="section-heading">
+            <div>
+              <h2>Sounds that matter<span id="cue-count">00</span></h2>
+              <p>A few examples turn an everyday sound into a cue.</p>
+            </div>
+            <button class="text-button" data-open-page="library">
+              View library<svg><use href="#i-arrow" /></svg>
+            </button>
+          </div>
+          <div id="station-cues" class="cue-grid"></div>
+          <div class="section-heading event-heading">
+            <div>
+              <h2>Recent activity<span class="live-dot"></span></h2>
+            </div>
+            <button class="text-button" data-open-page="journal">
+              Event journal<svg><use href="#i-arrow" /></svg>
+            </button>
+          </div>
+          <div id="recent-events" class="panel events-panel"></div>
+          <div class="signal-path">
+            <span class="signal-label">THE SIGNAL PATH</span
+            ><span
+              ><svg><use href="#i-mic" /></svg>Audio input</span
+            ><b>→</b
+            ><span
+              ><svg><use href="#i-chip" /></svg>Local embeddings</span
+            ><b>→</b
+            ><span
+              ><svg><use href="#i-grid" /></svg>Prototype match</span
+            ><b>→</b
+            ><span
+              ><svg><use href="#i-link" /></svg>Structured event</span
+            ><span class="signal-end">No live cloud calls.</span>
+          </div>
+        </section>
+
+        <section id="library-page" class="page-content hidden">
+          <div class="library-toolbar">
+            <span id="library-summary">Your personal vocabulary of sound.</span>
+            <div>
+              <button class="button secondary" id="calibrate-button">
+                <svg><use href="#i-sliders" /></svg>Room calibration</button
+              ><button class="button secondary" id="test-recording-button">
+                <svg><use href="#i-upload" /></svg>Test a recording
+              </button>
+            </div>
+          </div>
+          <div class="notice hidden" id="test-result" role="status"></div>
+          <div id="library-cues" class="cue-grid"></div>
+          <div class="info-panel">
+            <svg><use href="#i-wave" /></svg>
+            <div>
+              <strong>Specific to your sound, in your space.</strong>
+              <p>
+                Use 1–5 clear examples. Test against similar sounds, then tune
+                each cue’s similarity threshold. Scores are cosine similarity,
+                not probabilities.
+              </p>
+            </div>
+          </div>
+        </section>
+        <section id="journal-page" class="page-content hidden">
+          <div class="library-toolbar">
+            <span>Local detections, with time and match score.</span
+            ><button class="button secondary" id="export-events">
+              <svg><use href="#i-upload" /></svg>Export JSONL
+            </button>
+          </div>
+          <div id="journal-events" class="panel events-panel"></div>
+          <p class="footnote">
+            Recent 100 events shown. Full history is saved to
+            <code>data/events.jsonl</code>.
+          </p>
+        </section>
+        <footer>
+          <span
+            >PHYSICAL SHAZAM<span class="footer-dot">·</span>LEARNING TO
+            LISTEN</span
+          ><span>Built for the sounds around you.</span>
+        </footer>
+      </main>
+    </div>
+
+    <dialog id="enroll-dialog">
+      <form id="enroll-form">
+        <div class="dialog-top">
+          <span class="eyebrow">GROW YOUR SOUND LIBRARY</span
+          ><button
+            type="button"
+            class="icon-button"
+            data-close="enroll-dialog"
+            aria-label="Close enrollment"
+          >
+            <svg><use href="#i-close" /></svg>
+          </button>
+        </div>
+        <h2>Teach a sound.</h2>
+        <p class="dialog-subtitle">
+          A doorbell. A kettle. That unmistakable little beep.
+        </p>
+        <div class="steps">
+          <span class="active">01 <b>Capture</b></span
+          ><span>02 <b>Understand</b></span
+          ><span>03 <b>Listen</b></span>
+        </div>
+        <label class="field-label" for="cue-name">What should we call it?</label
+        ><input
+          id="cue-name"
+          placeholder="e.g. Front door chime"
+          maxlength="80"
+          required
+          autocomplete="off"
+        />
+        <div class="capture-heading">
+          <span class="field-label"
+            >Sound examples <span id="example-count">0 / 5</span></span
+          ><span>1–5 clips · 1–30 seconds each</span>
+        </div>
+        <div id="example-list"></div>
+        <div class="capture-area" id="drop-area">
+          <svg><use href="#i-wave" /></svg
+          ><strong id="capture-label">Let’s hear your sound.</strong>
+          <p id="capture-description">
+            Record a clear example, or drop in an audio file.
+          </p>
+          <div>
+            <button type="button" class="button secondary" id="record-button">
+              <svg><use href="#i-mic" /></svg>Record 4 seconds</button
+            ><button type="button" class="button subtle" id="upload-button">
+              <svg><use href="#i-upload" /></svg>Upload audio
+            </button>
+          </div>
+        </div>
+        <section class="teacher-card">
+          <div class="teacher-card-heading">
+            <span class="engine-icon lavender small"
+              ><svg><use href="#i-cloud" /></svg
+            ></span>
+            <div>
+              <strong>A second set of ears</strong>
+              <p>Gemini can describe the cue and flag similar sounds.</p>
+            </div>
+          </div>
+          <div id="teacher-result" class="hidden"></div>
+          <button type="button" id="ask-teacher" class="button secondary">
+            Ask Gemini<svg><use href="#i-arrow" /></svg></button
+          ><small
+            >Only these examples are sent to Google when you ask. Optional for
+            local enrollment.</small
+          >
+        </section>
+        <p class="form-error hidden" id="enroll-error" role="alert"></p>
+        <div class="dialog-footer">
+          <span id="enroll-hint">Your sound stays in your local library.</span
+          ><button class="button primary" id="save-cue" type="submit">
+            Add to library<svg><use href="#i-arrow" /></svg>
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="connections-dialog">
+      <div class="dialog-top">
+        <span class="eyebrow">CONNECTED WHEN IT COUNTS</span
+        ><button
+          class="icon-button"
+          data-close="connections-dialog"
+          aria-label="Close connections"
+        >
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <h2>Connections</h2>
+      <p class="dialog-subtitle">Cloud guidance in. Structured events out.</p>
+      <div class="connection-section">
+        <div class="connection-title">
+          <span class="engine-icon lavender"
+            ><svg><use href="#i-cloud" /></svg
+          ></span>
+          <div>
+            <h3>Gemini audio teacher</h3>
+            <p id="gemini-config-status">Checking configuration…</p>
+          </div>
+        </div>
+        <p>
+          Add your key to <code>.env</code> in the project directory. It stays
+          on the Python server and is never sent to this browser.
+        </p>
+        <pre>
+GEMINI_API_KEY=your-key-here
+GEMINI_MODEL=gemini-2.5-flash</pre
+        >
+        <small>Save the file, then reopen this panel. No restart needed.</small>
+      </div>
+      <form id="ros-form" class="connection-section">
+        <div class="connection-title">
+          <span class="engine-icon mint"
+            ><svg><use href="#i-link" /></svg
+          ></span>
+          <div>
+            <h3>ROS 2 · rosbridge</h3>
+            <p id="ros-config-status">Disabled</p>
+          </div>
+          <label class="switch"
+            ><input id="ros-enabled" type="checkbox" /><span></span
+            ><span class="sr-only">Enable ROS publishing</span></label
+          >
+        </div>
+        <label class="field-label" for="ros-url">Bridge WebSocket address</label
+        ><input id="ros-url" placeholder="ws://localhost:9090" required /><label
+          class="field-label"
+          for="ros-topic"
+          >Event topic</label
+        ><input id="ros-topic" value="/physical_shazam/events" required /><small
+          >Publishes event JSON as <code>std_msgs/msg/String</code>. No offline
+          replay.</small
+        >
+        <div class="bridge-help">
+          <strong>No robot connected yet?</strong>
+          <p>Run the local protocol sink in another terminal:</p>
+          <code>uv run python -m physical_shazam.mock_bridge</code>
+          <p>This tests message transport; it does not run a ROS graph.</p>
+        </div>
+        <p id="ros-error" class="form-error hidden" role="alert"></p>
+        <div class="connection-actions">
+          <button type="button" class="button secondary" id="test-ros">
+            Send test event</button
+          ><button type="submit" class="button primary">Save connection</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="cue-dialog">
+      <div class="dialog-top">
+        <span class="eyebrow">FINE-TUNE THE LISTENER</span
+        ><button
+          class="icon-button"
+          data-close="cue-dialog"
+          aria-label="Close cue settings"
+        >
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <form id="cue-settings-form">
+        <h2>Cue settings</h2>
+        <label class="field-label" for="edit-name">Sound name</label
+        ><input id="edit-name" required maxlength="80" /><label
+          class="field-label"
+          for="edit-threshold"
+          >Similarity threshold
+          <output id="edit-threshold-output">0.82</output></label
+        ><input
+          id="edit-threshold"
+          type="range"
+          min="0.1"
+          max="0.99"
+          step="0.01"
+        />
+        <p class="help-text">
+          Higher values are stricter. Lower values may catch quieter cues and
+          more false matches.
+        </p>
+        <div class="form-row">
+          <div>
+            <label class="field-label" for="edit-hits"
+              >Consecutive matching frames</label
+            ><input id="edit-hits" type="number" min="1" max="5" required />
+          </div>
+          <div>
+            <label class="field-label" for="edit-cooldown"
+              >Cooldown (seconds)</label
+            ><input
+              id="edit-cooldown"
+              type="number"
+              min="0"
+              max="60"
+              step="0.5"
+              required
+            />
+          </div>
+        </div>
+        <div id="saved-teacher" class="saved-teacher hidden"></div>
+        <p class="form-error hidden" id="cue-error" role="alert"></p>
+        <div class="dialog-footer">
+          <button type="button" class="text-button danger" id="delete-cue">
+            Delete sound</button
+          ><button class="button primary" type="submit">Save changes</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="calibrate-dialog">
+      <div class="dialog-top">
+        <span class="eyebrow">GET TO KNOW THE ROOM</span
+        ><button
+          class="icon-button"
+          data-close="calibrate-dialog"
+          aria-label="Close calibration"
+        >
+          <svg><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <h2>A moment of quiet.</h2>
+      <p class="dialog-subtitle">
+        Record 5 seconds of ordinary room noise without your target sounds.
+        Matches must then beat this background prototype by 0.05.
+      </p>
+      <div class="calibration-visual">
+        <svg><use href="#i-wave" /></svg>
+      </div>
+      <p id="calibration-status" class="help-text">
+        Keep the microphone where you’ll usually listen.
+      </p>
+      <div class="dialog-footer">
+        <button class="text-button" id="reset-background">
+          Clear calibration</button
+        ><button class="button primary" id="record-background">
+          <svg><use href="#i-mic" /></svg>Record room tone
+        </button>
+      </div>
+    </dialog>
+    <input
+      id="audio-file"
+      type="file"
+      accept="audio/wav,audio/x-wav,audio/flac,audio/ogg,.wav,.flac,.ogg"
+      multiple
+      hidden
+    /><input
+      id="test-file"
+      type="file"
+      accept="audio/wav,audio/x-wav,audio/flac,audio/ogg,.wav,.flac,.ogg"
+      hidden
+    />
+    <div id="toast" class="toast hidden" role="status"></div>
+  </body>
+</html>
