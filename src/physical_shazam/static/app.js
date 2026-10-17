@@ -1045,12 +1045,12 @@ const diagramSvg = $("system-diagram");
 const narrow = matchMedia("(max-width: 640px)");
 let diagram = new SystemDiagram(diagramSvg, {
   layout: narrow.matches ? "portrait" : "landscape",
-  scale: narrow.matches ? 1.9 : 1,
+  scale: narrow.matches ? 1.75 : 1,
 });
 narrow.addEventListener("change", () => {
   diagram = new SystemDiagram(diagramSvg, {
     layout: narrow.matches ? "portrait" : "landscape",
-    scale: narrow.matches ? 1.9 : 1,
+    scale: narrow.matches ? 1.75 : 1,
   });
   updateDiagram();
 });
@@ -1141,7 +1141,7 @@ function updateDiagram() {
   diagram.set(
     "event",
     last ? "ready" : "idle",
-    last ? `${timeLabel(last.timestamp)} · ${last.name}` : "Nothing yet",
+    last ? last.name : "Nothing yet",
   );
   diagram.set(
     "journal",

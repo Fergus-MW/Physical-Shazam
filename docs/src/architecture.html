@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Physical Shazam · architecture loop</title>
+    <link rel="stylesheet" href="../../src/physical_shazam/static/style.css" />
+    <style>
+      html, body { margin: 0; width: 720px; height: 1280px; overflow: hidden; background: #101310; }
+      #stage { position: absolute; inset: 0; display: grid; place-items: center; }
+      #stage svg.system-diagram { width: 680px; height: auto; }
+      #sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <div id="sprite"></div>
+    <div id="stage"><svg id="diagram" class="system-diagram" role="img" aria-label="Physical Shazam architecture"></svg></div>
+    <script type="module">
+      import { SystemDiagram } from "../../src/physical_shazam/static/diagram.js";
+
+      const html = await (await fetch("../../src/physical_shazam/static/index.html")).text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+      document.getElementById("sprite").append(
+        ...[...doc.querySelectorAll("svg")].filter((s) => s.querySelector("symbol")),
+      );
+
+      const LOOP = 6;
+      const diagram = new SystemDiagram(document.getElementById("diagram"), {
+        layout: "portrait",
+        scale: 1.75,
+      });
+      const ms = (s) => s * 1000;
+      const schedule = [];
+      for (let loop = 0; loop < 40; loop++) {
+        const base = loop * LOOP;
+        for (let i = 0; i < 12; i++)
+          schedule.push([base + i * 0.5, ["mic", "window", "encoder", "match"], 1.1, ""]);
+        schedule.push([base + 2.6, ["match", "event", "journal"], 0.8, "event"]);
+        schedule.push([base + 3.2, ["event", "ros"], 0.6, "event"]);
+        schedule.push([base + 4.1, ["gemini", "library", "match"], 1.2, ""]);
+      }
+      schedule.sort((a, b) => a[0] - b[0]);
+      let next = 0;
+
+      window.render = (t) => {
+        const local = t % LOOP;
+        while (next < schedule.length && schedule[next][0] <= t) {
+          const [at, route, duration, kind] = schedule[next++];
+          diagram.send(route, ms(at), { duration: ms(duration) / (route.length - 1), kind });
+        }
+        const level = -26 + 9 * Math.sin(t * 2.1) + 4 * Math.sin(t * 5.3);
+        const heard = local > 2.6 && local < 5.6;
+        const score = heard ? 0.91 : 0.2 + 0.08 * Math.sin(t * 3);
+        diagram.set("mic", "active", `${level.toFixed(1)} dBFS`);
+        diagram.set("window", "active", "16 kHz · 975 ms");
+        diagram.set("encoder", "active", `YAMNet · ${5 + Math.round(1.5 + Math.sin(t * 4))} ms`);
+        diagram.set("library", local > 4.1 && local < 5.6 ? "active" : "ready", "3 sounds · 3 on");
+        diagram.set("gemini", local > 4.1 && local < 5.4 ? "active" : "ready", local > 4.1 && local < 5.4 ? "Reviewing…" : "On demand");
+        diagram.set("match", "active", `${score.toFixed(2)} · Doorbell`);
+        diagram.set("event", heard ? "active" : "ready", heard ? "Doorbell · 0.91" : "Listening…");
+        diagram.set("journal", "ready", local > 3.2 ? "12 saved locally" : "11 saved locally");
+        diagram.set("ros", "ready", local > 3.8 ? "12 sent" : "11 sent");
+        for (const [a, b] of [["mic", "window"], ["window", "encoder"], ["encoder", "match"], ["library", "match"], ["event", "ros"]])
+          diagram.flow(a, b, true);
+        diagram.flow("gemini", "library", local > 4.1 && local < 5.4);
+        if (Math.abs(local - 2.95) < 0.02) diagram.flash("event", ms(t));
+        diagram.frame(ms(t));
+      };
+      window.ready = true;
+      if (!navigator.webdriver) {
+        const start = performance.now();
+        const tick = () => { window.render((performance.now() - start) / 1000); requestAnimationFrame(tick); };
+        requestAnimationFrame(tick);
+      }
+    </script>
+  </body>
+</html>
